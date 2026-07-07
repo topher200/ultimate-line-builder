@@ -1,0 +1,121 @@
+import { describe, expect, it } from 'vitest';
+import { deriveState } from './fold.ts';
+import type { EventEnvelope, EventPayload } from './types.ts';
+
+let seq = 0;
+function ev(payload: EventPayload, id = `e${seq}`): EventEnvelope {
+  return {
+    id,
+    gameId: 'g1',
+    seq: seq++,
+    parentId: null,
+    deviceId: 'd1',
+    ts: seq,
+    payload,
+  };
+}
+
+function point(
+  players: string[],
+  scoredBy: 'us' | 'them',
+  possession: 'O' | 'D',
+  majority: 'M' | 'W',
+  id?: string,
+): EventEnvelope {
+  return ev(
+    {
+      kind: 'PointCompleted',
+      lineup: players.map((playerId) => ({ playerId })),
+      possession,
+      majority,
+      scoredBy,
+    },
+    id,
+  );
+}
+
+const start = ev({
+  kind: 'GameStarted',
+  startingPossession: 'D',
+  startingMajority: 'M',
+  expectedPoints: 20,
+  mode: 0,
+});
+
+describe('deriveState', () => {
+  it('returns defaults for an empty log', () => {
+    const s = deriveState([]);
+    expect(s.totalPoints).toBe(0);
+    expect(s.expectedPoints).toBe(20);
+    expect(s.nextPossession).toBe('O');
+  });
+
+  it('applies GameStarted config and first-point context', () => {
+    const s = deriveState([start]);
+    expect(s.nextPossession).toBe('D');
+    expect(s.nextMajority).toBe('M');
+    expect(s.mode).toBe(0);
+  });
+
+  it('counts players and tracks score and next possession after a point', () => {
+    const s = deriveState([start, point(['a', 'b'], 'us', 'D', 'M')]);
+    expect(s.played).toEqual({ a: 1, b: 1 });
+    expect(s.score).toEqual({ us: 1, them: 0 });
+    expect(s.totalPoints).toBe(1);
+    expect(s.nextPossession).toBe('D'); // we scored -> we pull -> D
+  });
+
+  it('goes to O after they score', () => {
+    const s = deriveState([start, point(['a'], 'them', 'D', 'M')]);
+    expect(s.nextPossession).toBe('O');
+  });
+
+  it('credits both players on an injury sub (>7 entries)', () => {
+    const inj = ev({
+      kind: 'PointCompleted',
+      lineup: [
+        { playerId: 'a' },
+        { playerId: 'sub', injurySubFor: 'a' },
+        { playerId: 'b' },
+      ],
+      possession: 'D',
+      majority: 'M',
+      scoredBy: 'us',
+    });
+    const s = deriveState([start, inj]);
+    expect(s.played).toEqual({ a: 1, sub: 1, b: 1 });
+  });
+
+  it('skips undone points', () => {
+    const p = point(['a'], 'us', 'D', 'M', 'p1');
+    const undo: EventPayload = { kind: 'PointUndone', targetId: 'p1' };
+    const s = deriveState([start, p, ev(undo)]);
+    expect(s.totalPoints).toBe(0);
+    expect(s.played).toEqual({});
+    expect(s.score).toEqual({ us: 0, them: 0 });
+  });
+
+  it('resets half counts and flips possession at the second half', () => {
+    const s = deriveState([
+      start,
+      point(['a'], 'us', 'D', 'M'),
+      ev({ kind: 'HalfStarted' }),
+    ]);
+    expect(s.half).toBe(2);
+    expect(s.pointsPlayedThisHalf).toBe(0);
+    expect(s.playedThisHalf).toEqual({ a: 0 });
+    expect(s.nextPossession).toBe('O'); // started game on D -> half opens O
+    expect(s.nextMajority).toBe('M'); // half opens on the game's starting majority
+  });
+
+  it('honors a pending majority override for the next point only', () => {
+    const s = deriveState([start, ev({ kind: 'MajorityOverridden', value: 'W' })]);
+    expect(s.nextMajority).toBe('W');
+    const s2 = deriveState([
+      start,
+      ev({ kind: 'MajorityOverridden', value: 'W' }),
+      point(['a'], 'us', 'D', 'W'),
+    ]);
+    expect(s2.nextMajority).toBe('W'); // point 2 in half: pattern B = opposite of M
+  });
+});
