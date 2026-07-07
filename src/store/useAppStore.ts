@@ -19,6 +19,18 @@ import {
   rollNewTournamentId,
 } from '../lib/ids.ts';
 import { LocalRepository, type Repository } from '../persistence/repository.ts';
+import { isSupabaseConfigured } from '../persistence/supabaseClient.ts';
+import { SupabaseRepository } from '../persistence/supabaseRepository.ts';
+import { syncGame } from '../persistence/sync.ts';
+
+// Cloud mirror, only when the publishable key is configured. Writes are pushed
+// best-effort (local stays the source of truth); errors never break the app.
+const remote = isSupabaseConfigured ? new SupabaseRepository() : null;
+
+function pushRemote(op: () => Promise<unknown>): void {
+  if (!remote) return;
+  void op().catch((e) => console.warn('[sync] push failed', e));
+}
 
 interface AppState {
   repo: Repository;
@@ -85,6 +97,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       events: currentGameId ? (logs[currentGameId] ?? []) : [],
       ready: true,
     });
+    void reconcileRemote(get, set);
   },
 
   addPlayer: (p) => {
@@ -118,6 +131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
     const games = [...get().games, meta];
     void get().repo.saveGames(games);
+    pushRemote(() => remote!.saveGames(games));
     set({
       games,
       currentGameId: gameId,
@@ -181,6 +195,7 @@ function persistRoster(
     updatedBy: get().deviceId,
   };
   void get().repo.saveRoster(roster);
+  pushRemote(() => remote!.saveRoster(roster));
 }
 
 function appendEvent(
@@ -202,4 +217,52 @@ function appendEvent(
   const next = [...events, envelope];
   set({ events: next, logs: { ...logs, [currentGameId]: next } });
   void repo.appendEvent(envelope);
+  pushRemote(() => remote!.appendEvent(envelope));
+}
+
+/**
+ * Best-effort pull from Supabase on startup: union the game list, longest-chain
+ * merge each log, adopt the remote roster if we have none locally, and persist
+ * the results. Runs only when configured; failures are logged, not surfaced.
+ */
+async function reconcileRemote(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+): Promise<void> {
+  if (!remote) return;
+  try {
+    const [remoteRoster, remoteGames] = await Promise.all([
+      remote.loadRoster(),
+      remote.listGames(),
+    ]);
+
+    const byId = new Map<Id, GameMeta>();
+    for (const g of remoteGames) byId.set(g.gameId, g);
+    for (const g of get().games) byId.set(g.gameId, g);
+    const games = [...byId.values()].sort((a, b) => a.createdAt - b.createdAt);
+
+    const logs = { ...get().logs };
+    for (const g of games) {
+      logs[g.gameId] = await syncGame(remote, g.gameId, logs[g.gameId] ?? []);
+      await get().repo.saveLog(g.gameId, logs[g.gameId]);
+    }
+    await get().repo.saveGames(games);
+
+    let players = get().players;
+    if (players.length === 0 && remoteRoster) {
+      players = remoteRoster.players;
+      await get().repo.saveRoster(remoteRoster);
+    }
+
+    const currentGameId = get().currentGameId ?? games.at(-1)?.gameId ?? null;
+    set({
+      players,
+      games,
+      logs,
+      currentGameId,
+      events: currentGameId ? (logs[currentGameId] ?? []) : [],
+    });
+  } catch (e) {
+    console.warn('[sync] reconcile failed', e);
+  }
 }

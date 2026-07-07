@@ -6,6 +6,7 @@ export interface Repository {
   listGames(): Promise<GameMeta[]>;
   saveGames(games: GameMeta[]): Promise<void>;
   loadLog(gameId: Id): Promise<EventEnvelope[]>;
+  saveLog(gameId: Id, events: EventEnvelope[]): Promise<void>;
   appendEvent(event: EventEnvelope): Promise<void>;
 }
 
@@ -35,6 +36,10 @@ export class LocalRepository implements Repository {
 
   async loadLog(gameId: Id): Promise<EventEnvelope[]> {
     return readJson<EventEnvelope[]>(KEY.log(gameId)) ?? [];
+  }
+
+  async saveLog(gameId: Id, events: EventEnvelope[]): Promise<void> {
+    writeJson(KEY.log(gameId), events);
   }
 
   async appendEvent(event: EventEnvelope): Promise<void> {
