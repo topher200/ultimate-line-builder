@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore.ts';
 import { runDoctor } from '../domain/doctor.ts';
+import { parseRosterText } from '../domain/rosterImport.ts';
 import type { Gender, Line } from '../domain/types.ts';
 
 export function RosterScreen() {
@@ -12,6 +13,19 @@ export function RosterScreen() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('MMP');
   const [line, setLine] = useState<Line>('O');
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+
+  const runImport = () => {
+    const { players: parsed, errors } = parseRosterText(importText);
+    for (const p of parsed) addPlayer(p);
+    setImportErrors(errors);
+    if (errors.length === 0) {
+      setImportText('');
+      setShowImport(false);
+    }
+  };
 
   const warnings = runDoctor(players, 20);
   const sorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
@@ -65,7 +79,42 @@ export function RosterScreen() {
         >
           Add
         </button>
+        <button
+          className="rounded bg-slate-600 px-4 py-2 font-semibold"
+          onClick={() => setShowImport((v) => !v)}
+        >
+          Import
+        </button>
       </div>
+
+      {showImport && (
+        <div className="flex flex-col gap-2 rounded-lg bg-slate-800 p-3">
+          <div className="text-sm text-slate-400">
+            One player per line: <code>Name, Gender, Line</code> (Gender = MMP or
+            WMP, Line = O or D). Comma or tab separated.
+          </div>
+          <textarea
+            className="h-40 w-full rounded bg-slate-700 px-3 py-2 font-mono text-sm"
+            placeholder={'Alex, MMP, D\nSam, WMP, O'}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+          />
+          {importErrors.length > 0 && (
+            <div className="flex flex-col gap-1 text-sm text-amber-300">
+              {importErrors.map((err, i) => (
+                <div key={i}>⚠ {err}</div>
+              ))}
+            </div>
+          )}
+          <button
+            className="self-start rounded bg-emerald-600 px-4 py-2 font-semibold disabled:opacity-40"
+            disabled={!importText.trim()}
+            onClick={runImport}
+          >
+            Add these players
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {sorted.map((p) => (
@@ -122,7 +171,7 @@ export function RosterScreen() {
         ))}
         {players.length === 0 && (
           <p className="p-6 text-center text-slate-400">
-            Add players to build your roster.
+            Add players one at a time, or use Import to paste the whole team.
           </p>
         )}
       </div>
