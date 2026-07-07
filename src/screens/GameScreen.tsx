@@ -5,7 +5,13 @@ import { computeTargets, predictGame, selectLine } from '../domain/engine.ts';
 import { slotsForMajority } from '../domain/rules.ts';
 import { sameDay, sumPlayedAcross } from '../domain/aggregate.ts';
 import { ModeSlider } from '../components/ModeSlider.tsx';
-import type { LineupEntry, MajorityGender, Player, Possession } from '../domain/types.ts';
+import type {
+  Line,
+  LineupEntry,
+  MajorityGender,
+  Player,
+  Possession,
+} from '../domain/types.ts';
 
 export function GameScreen() {
   const currentGameId = useAppStore((s) => s.currentGameId);
@@ -97,7 +103,7 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
   const currentGameId = useAppStore((s) => s.currentGameId);
   const { game, targets, predicted } = useMemo(() => {
     const g = deriveState(events);
-    const t = computeTargets(players, g.expectedPoints, g.mode);
+    const t = computeTargets(players, g.expectedPoints, g.mode, 0.5, g.modeBaseline);
     return { game: g, targets: t, predicted: predictGame(g, players, t) };
   }, [events, players]);
   const { dayPlayed, tournamentPlayed } = useMemo(() => {
@@ -122,12 +128,22 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
   const overridePossession = useAppStore((s) => s.overridePossession);
   const overrideMajority = useAppStore((s) => s.overrideMajority);
 
-  const context = { possession: game.nextPossession, majority: game.nextMajority };
+  // Which line takes the field. Defaults to the line matching possession; the
+  // coach can call the other line for a point (it resets each new point).
+  const defaultLine: Line = game.nextPossession;
+  const [fieldedLine, setFieldedLine] = useState<Line>(defaultLine);
+  useEffect(() => setFieldedLine(defaultLine), [game.totalPoints, defaultLine]);
+
+  const context = {
+    possession: game.nextPossession,
+    majority: game.nextMajority,
+    line: fieldedLine,
+  };
   const suggestion = useMemo(
     () => selectLine(game, players, context, targets),
     // Regenerate when the point context changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [game.totalPoints, game.nextPossession, game.nextMajority, game.mode],
+    [game.totalPoints, game.nextPossession, game.nextMajority, game.mode, fieldedLine],
   );
 
   const [lineup, setLineup] = useState<LineupEntry[]>(suggestion.lineup);
@@ -158,7 +174,7 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
       </div>
 
       {/* Point context */}
-      <div className="flex items-center gap-3 rounded-lg bg-slate-800 p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
         <Segmented
           options={[
             { value: 'O', label: 'Offense' },
@@ -175,6 +191,21 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
           value={game.nextMajority}
           onChange={overrideMajority}
         />
+        <div className="flex items-center gap-2">
+          <Segmented
+            options={[
+              { value: 'O', label: 'O line' },
+              { value: 'D', label: 'D line' },
+            ]}
+            value={fieldedLine}
+            onChange={setFieldedLine}
+          />
+          {fieldedLine !== defaultLine && (
+            <span className="text-xs font-semibold text-amber-300">
+              calling {fieldedLine} line on {game.nextPossession === 'O' ? 'offense' : 'defense'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Suggested line */}

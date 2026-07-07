@@ -37,6 +37,8 @@ export function deriveState(events: EventEnvelope[]): GameState {
   const playedThisHalf: Record<string, number> = {};
   let pendingPossession: Possession | null = null;
   let pendingMajority: MajorityGender | null = null;
+  let baselineTotalPoints = 0;
+  let baselinePlayed: Record<string, number> = {};
 
   for (const e of events) {
     const p = e.payload;
@@ -52,6 +54,9 @@ export function deriveState(events: EventEnvelope[]): GameState {
         break;
       case 'ModeChanged':
         mode = p.value;
+        // Re-plan the remaining points from here: pin the baseline to now.
+        baselineTotalPoints = totalPoints;
+        baselinePlayed = { ...played };
         break;
       case 'PossessionOverridden':
         pendingPossession = p.value;
@@ -108,6 +113,7 @@ export function deriveState(events: EventEnvelope[]): GameState {
     pointsPlayedThisHalf,
     nextPossession: pendingPossession ?? basePossession,
     nextMajority: pendingMajority ?? baseMajority,
+    modeBaseline: { totalPoints: baselineTotalPoints, played: baselinePlayed },
   };
 }
 

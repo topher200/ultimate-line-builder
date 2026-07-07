@@ -70,6 +70,17 @@ export interface GameMeta {
   tournamentId: Id;
 }
 
+/**
+ * Snapshot of play at the moment the mode was last changed. Goals distribute the
+ * points remaining after this baseline, so changing the mode re-plans from here
+ * forward rather than rewriting the whole-game goal. Derived from the log
+ * position of the latest ModeChanged (start of game if none).
+ */
+export interface ModeBaseline {
+  totalPoints: number;
+  played: Record<Id, number>;
+}
+
 /** Everything on-screen derives from folding the event log into this. */
 export interface GameState {
   expectedPoints: number;
@@ -88,9 +99,13 @@ export interface GameState {
   nextPossession: Possession;
   nextMajority: MajorityGender;
   pointsPlayedThisHalf: number;
+  modeBaseline: ModeBaseline;
 }
 
 export interface PointContext {
   possession: Possession;
   majority: MajorityGender;
+  /** Which line takes the field. Defaults to the line matching possession; the
+   * coach can call the other line for a point. */
+  line: Line;
 }

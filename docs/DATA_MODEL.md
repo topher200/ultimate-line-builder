@@ -213,35 +213,61 @@ and for the `events` primary key.
 Pure functions in `src/domain/`. Given the derived `GameState`, the roster, and
 the current point context, produce a suggested line of 7.
 
-### 8.1 Targets
+### One line per point (never a mix)
 
-The point pool has `7 x expectedPoints` player-slots. Give each active player a
-weight from their rating blended by the mode:
+A point is played entirely by one line: an O point by the O line, a D point by
+the D line. The engine **never** suggests a mixed line drawing from both. Each
+player only ever plays with their own line's players. The coach can manually
+**call the other whole line** for a point (most often the D line onto an offense
+point) via the fielded-line toggle; the engine then suggests that line's
+players. It never proposes the cross-line call itself, and if a fielded line is
+short a gender it flags the shortfall rather than borrowing from the other line.
+
+Mode never crosses lines. It only changes the *weighting within* a line's pool.
+
+### 8.1 Targets (line-scoped, going-forward)
+
+Because players only play their own line, goals are scoped per **(line, gender)**
+pool over that line's share of the game. Weight blends the rating by mode:
 
 ```
 w_competitive(p) = p.competitiveness
 w_equal(p)       = 1
 w_noncomp(p)     = 1 - p.competitiveness
 weight(p, mode)  = blend(mode, w_competitive, w_equal, w_noncomp)  // piecewise lerp
-target(p) = expectedPoints * weight(p) / sum(weight over active players)
 ```
 
-`target(p)` is the player's **Goal** for the game. Targets are always computed
-for the *whole* game, which is what makes a mid-game mode change smooth: only
-the remaining points get re-planned, via the deficit below.
+The mode slider means **going forward**, not end-of-game. Changing the mode
+re-plans only the points remaining from that moment, keeping the head start each
+player already earned. The baseline (points played, and per-player counts, at
+the last mode change) is *derived* from the log position of the latest
+`ModeChanged` -- no snapshot is stored in the event, so undo and log-merge stay
+correct for free. With the default start-of-game baseline this is a plain
+whole-game goal.
+
+```
+remaining          = max(0, expectedPoints - baseline.totalPoints)
+remainingSlots(g)  = avgSlotsPerPoint(gender) * remaining * lineShare  // O or D share
+target(p) = min(expectedPoints,
+                baseline.played[p] + remainingSlots * weight(p) / sum(weight over pool))
+```
+
+`target(p)` is the player's **Goal**. The deficit then collapses to "your share
+of the remaining pool minus what you've played since the slider moved," so right
+after a switch every player has a positive deficit (nobody is retroactively
+benched to equalize final totals).
 
 ### 8.2 Per-point selection
 
-For the current point we need slots by gender (4/3 per the majority) and, in
-competitive contexts, by line (O players for O points, D players for D points).
+Only the fielded line's players are eligible; within each gender slot (4/3 per
+the majority) we take the players furthest behind their target.
 
 ```
-eligible = active players of the required gender
-           preferring the matching line; in equal/non-comp mode, cross-line
-           is allowed to balance time (rare, per the rules)
+eligible = active players on the fielded line, of the required gender
 priority(p) = target(p) - played_this_game(p)     // "deficit": how owed a point
             + urgencyBoost(p)                      // once-per-half constraint
-fill each gender slot with the highest-priority eligible players
+fill each gender slot with the highest-priority eligible players;
+flag `short` if the line cannot fill a slot (no cross-line backfill)
 ```
 
 `urgencyBoost` ramps as the half runs out: any active player with 0 points this
@@ -251,10 +277,9 @@ the points remaining), the **Doctor** flags it rather than the engine failing
 silently.
 
 The engine returns the 7 chosen players **plus a short explanation** per pick
-(e.g. "owed a point", "best D handler", "needs a half point") so the coach
-trusts the suggestion and can edit with context. Edits (swap a player, add an
-injury sub) adjust the proposed lineup before it is confirmed into a
-`PointCompleted` event.
+("owed a point", "needs a half point") so the coach trusts the suggestion and
+can edit with context. Edits (swap a player, add an injury sub) adjust the
+proposed lineup before it is confirmed into a `PointCompleted` event.
 
 ### 8.3 Prediction
 

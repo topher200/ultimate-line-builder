@@ -90,12 +90,13 @@ export function RosterScreen() {
       {showImport && (
         <div className="flex flex-col gap-2 rounded-lg bg-slate-800 p-3">
           <div className="text-sm text-slate-400">
-            One player per line: <code>Name, Gender, Line</code> (Gender = MMP or
-            WMP, Line = O or D). Comma or tab separated.
+            One player per line: <code>Name, Gender, Line, Competitiveness</code>{' '}
+            (Gender = MMP or WMP, Line = O or D, Competitiveness = 0-100 and
+            optional, default 50). Comma or tab separated.
           </div>
           <textarea
             className="h-40 w-full rounded bg-slate-700 px-3 py-2 font-mono text-sm"
-            placeholder={'Alex, MMP, D\nSam, WMP, O'}
+            placeholder={'Alex, MMP, D, 100\nSam, WMP, O, 40'}
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
           />
