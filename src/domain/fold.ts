@@ -114,3 +114,23 @@ export function deriveState(events: EventEnvelope[]): GameState {
 function distinctPlayerIds(lineup: { playerId: string }[]): string[] {
   return [...new Set(lineup.map((l) => l.playerId))];
 }
+
+/** A brand-new game's state from config, for what-if simulation (Predictor). */
+export function freshGameState(config: {
+  startingPossession: Possession;
+  startingMajority: MajorityGender;
+  expectedPoints: number;
+  mode: number;
+}): GameState {
+  return deriveState([
+    {
+      id: 'seed',
+      gameId: 'sim',
+      seq: 0,
+      parentId: null,
+      deviceId: 'sim',
+      ts: 0,
+      payload: { kind: 'GameStarted', ...config },
+    },
+  ]);
+}

@@ -150,6 +150,18 @@ describe('predictGame', () => {
     const predicted = predictGame(state({ mode: 0 }), roster, targets);
     expect(predicted['mo1']).toBeGreaterThan(predicted['md3']);
   });
+
+  it('forcing O possession favors O-line players over D-line', () => {
+    const targets = computeTargets(roster, 20, 0);
+    const s = state({ mode: 0 });
+    const oOnly = predictGame(s, roster, targets, { forcePossession: 'O' });
+    const dOnly = predictGame(s, roster, targets, { forcePossession: 'D' });
+    // An O-line player plays more when every point is offense.
+    expect(oOnly['mo1']).toBeGreaterThan(dOnly['mo1']);
+    // Total player-points is unchanged (7 per point).
+    const total = Object.values(oOnly).reduce((a, b) => a + b, 0);
+    expect(total).toBe(7 * 20);
+  });
 });
 
 function countGenders(ids: string[]): Record<Gender, number> {

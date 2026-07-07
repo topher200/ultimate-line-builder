@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { deriveState } from '../domain/fold.ts';
-import { computeTargets, predictGame } from '../domain/engine.ts';
 import type {
   EventEnvelope,
   EventPayload,
@@ -13,16 +12,25 @@ import type {
   Possession,
   Roster,
 } from '../domain/types.ts';
-import { getDeviceId, newId } from '../lib/ids.ts';
+import {
+  getCurrentTournamentId,
+  getDeviceId,
+  newId,
+  rollNewTournamentId,
+} from '../lib/ids.ts';
 import { LocalRepository, type Repository } from '../persistence/repository.ts';
 
 interface AppState {
   repo: Repository;
   deviceId: string;
+  currentTournamentId: Id;
   ready: boolean;
   players: Player[];
   games: GameMeta[];
   currentGameId: Id | null;
+  /** Every game's log, kept in memory for cross-game aggregates. */
+  logs: Record<Id, EventEnvelope[]>;
+  /** Convenience mirror of logs[currentGameId]. */
   events: EventEnvelope[];
 
   init: () => Promise<void>;
@@ -40,7 +48,8 @@ interface AppState {
     expectedPoints: number;
     mode: Mode;
   }) => void;
-  loadGame: (gameId: Id) => Promise<void>;
+  loadGame: (gameId: Id) => void;
+  startNewTournament: () => void;
   recordPoint: (lineup: LineupEntry[], scoredBy: 'us' | 'them') => void;
   undoLastPoint: () => void;
   startSecondHalf: () => void;
@@ -53,19 +62,29 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
   repo: new LocalRepository(),
   deviceId: getDeviceId(),
+  currentTournamentId: getCurrentTournamentId(),
   ready: false,
   players: [],
   games: [],
   currentGameId: null,
+  logs: {},
   events: [],
 
   init: async () => {
     const { repo } = get();
     const roster = await repo.loadRoster();
     const games = await repo.listGames();
+    const logs: Record<Id, EventEnvelope[]> = {};
+    for (const g of games) logs[g.gameId] = await repo.loadLog(g.gameId);
     const currentGameId = games.at(-1)?.gameId ?? null;
-    const events = currentGameId ? await repo.loadLog(currentGameId) : [];
-    set({ players: roster?.players ?? [], games, currentGameId, events, ready: true });
+    set({
+      players: roster?.players ?? [],
+      games,
+      logs,
+      currentGameId,
+      events: currentGameId ? (logs[currentGameId] ?? []) : [],
+      ready: true,
+    });
   },
 
   addPlayer: (p) => {
@@ -91,10 +110,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   newGame: (opts) => {
     const gameId = newId();
-    const meta: GameMeta = { gameId, name: opts.name, createdAt: Date.now() };
+    const meta: GameMeta = {
+      gameId,
+      name: opts.name,
+      createdAt: Date.now(),
+      tournamentId: get().currentTournamentId,
+    };
     const games = [...get().games, meta];
     void get().repo.saveGames(games);
-    set({ games, currentGameId: gameId, events: [] });
+    set({
+      games,
+      currentGameId: gameId,
+      logs: { ...get().logs, [gameId]: [] },
+      events: [],
+    });
     appendEvent(get, set, {
       kind: 'GameStarted',
       startingPossession: opts.startingPossession,
@@ -104,9 +133,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  loadGame: async (gameId) => {
-    const events = await get().repo.loadLog(gameId);
-    set({ currentGameId: gameId, events });
+  loadGame: (gameId) => {
+    set({ currentGameId: gameId, events: get().logs[gameId] ?? [] });
+  },
+
+  startNewTournament: () => {
+    set({ currentTournamentId: rollNewTournamentId() });
   },
 
   recordPoint: (lineup, scoredBy) => {
@@ -156,7 +188,7 @@ function appendEvent(
   set: (partial: Partial<AppState>) => void,
   payload: EventPayload,
 ): void {
-  const { events, currentGameId, deviceId, repo } = get();
+  const { events, currentGameId, deviceId, repo, logs } = get();
   if (!currentGameId) return;
   const envelope: EventEnvelope = {
     id: newId(),
@@ -167,14 +199,7 @@ function appendEvent(
     ts: Date.now(),
     payload,
   };
-  set({ events: [...events, envelope] });
+  const next = [...events, envelope];
+  set({ events: next, logs: { ...logs, [currentGameId]: next } });
   void repo.appendEvent(envelope);
-}
-
-/** Derived view for components: folded state plus goals and predictions. */
-export function selectDerived(s: AppState) {
-  const game = deriveState(s.events);
-  const targets = computeTargets(s.players, game.expectedPoints, game.mode);
-  const predicted = predictGame(game, s.players, targets);
-  return { game, targets, predicted };
 }

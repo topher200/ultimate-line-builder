@@ -3,23 +3,38 @@ import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
 import { computeTargets, predictGame, selectLine } from '../domain/engine.ts';
 import { slotsForMajority } from '../domain/rules.ts';
+import { sameDay, sumPlayedAcross } from '../domain/aggregate.ts';
+import { ModeSlider } from '../components/ModeSlider.tsx';
 import type { LineupEntry, MajorityGender, Player, Possession } from '../domain/types.ts';
 
 export function GameScreen() {
   const currentGameId = useAppStore((s) => s.currentGameId);
   const events = useAppStore((s) => s.events);
+  const [starting, setStarting] = useState(false);
   const hasGame = currentGameId != null && events.length > 0;
 
-  if (!hasGame) return <NewGamePanel />;
-  return <ActiveGame />;
+  if (!hasGame || starting) return <NewGamePanel onStarted={() => setStarting(false)} />;
+  return <ActiveGame onNewGame={() => setStarting(true)} />;
 }
 
-function NewGamePanel() {
+function NewGamePanel({ onStarted }: { onStarted: () => void }) {
   const newGame = useAppStore((s) => s.newGame);
+  const startNewTournament = useAppStore((s) => s.startNewTournament);
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
   const [expectedPoints, setExpectedPoints] = useState(20);
   const [mode, setMode] = useState(0);
+
+  const start = () => {
+    newGame({
+      name: new Date().toLocaleString(),
+      startingPossession: possession,
+      startingMajority: majority,
+      expectedPoints,
+      mode,
+    });
+    onStarted();
+  };
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-4 p-6">
@@ -54,42 +69,51 @@ function NewGamePanel() {
           onChange={(e) => setExpectedPoints(Number(e.target.value))}
         />
       </Field>
-      <Field label={modeLabel(mode)}>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={mode * 100}
-          className="w-full"
-          onChange={(e) => setMode(Number(e.target.value) / 100)}
-        />
-      </Field>
+      <ModeSlider value={mode} onChange={setMode} />
       <button
         className="rounded bg-emerald-600 py-3 text-lg font-semibold"
-        onClick={() =>
-          newGame({
-            name: new Date().toLocaleString(),
-            startingPossession: possession,
-            startingMajority: majority,
-            expectedPoints,
-            mode,
-          })
-        }
+        onClick={start}
       >
-        Start
+        Start game
+      </button>
+      <button
+        className="rounded bg-slate-700 py-2 text-sm text-slate-300"
+        onClick={() => {
+          startNewTournament();
+          start();
+        }}
+      >
+        Start as a new tournament
       </button>
     </div>
   );
 }
 
-function ActiveGame() {
+function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
   const players = useAppStore((s) => s.players);
   const events = useAppStore((s) => s.events);
+  const games = useAppStore((s) => s.games);
+  const logs = useAppStore((s) => s.logs);
+  const currentGameId = useAppStore((s) => s.currentGameId);
   const { game, targets, predicted } = useMemo(() => {
     const g = deriveState(events);
     const t = computeTargets(players, g.expectedPoints, g.mode);
     return { game: g, targets: t, predicted: predictGame(g, players, t) };
   }, [events, players]);
+  const { dayPlayed, tournamentPlayed } = useMemo(() => {
+    const current = games.find((m) => m.gameId === currentGameId);
+    if (!current) return { dayPlayed: {}, tournamentPlayed: {} };
+    const dayLogs = games
+      .filter((m) => sameDay(m.createdAt, current.createdAt))
+      .map((m) => logs[m.gameId] ?? []);
+    const tournLogs = games
+      .filter((m) => m.tournamentId === current.tournamentId)
+      .map((m) => logs[m.gameId] ?? []);
+    return {
+      dayPlayed: sumPlayedAcross(dayLogs),
+      tournamentPlayed: sumPlayedAcross(tournLogs),
+    };
+  }, [games, logs, currentGameId]);
   const recordPoint = useAppStore((s) => s.recordPoint);
   const undoLastPoint = useAppStore((s) => s.undoLastPoint);
   const startSecondHalf = useAppStore((s) => s.startSecondHalf);
@@ -234,6 +258,9 @@ function ActiveGame() {
         <button className="rounded bg-slate-600 px-4 py-2" onClick={startSecondHalf}>
           Start 2nd half
         </button>
+        <button className="rounded bg-slate-600 px-4 py-2" onClick={onNewGame}>
+          New game
+        </button>
         <label className="flex items-center gap-2 text-sm">
           Expected pts
           <input
@@ -245,33 +272,24 @@ function ActiveGame() {
             onChange={(e) => setExpectedPoints(Number(e.target.value))}
           />
         </label>
-        <label className="flex flex-1 items-center gap-2 text-sm">
-          <span className="whitespace-nowrap">{modeLabel(game.mode)}</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={game.mode * 100}
-            className="flex-1"
-            onChange={(e) => setMode(Number(e.target.value) / 100)}
-          />
-        </label>
+        <ModeSlider value={game.mode} onChange={setMode} className="flex-1" />
       </div>
 
       {/* Playing time (no competitiveness ratings shown) */}
       <div className="rounded-lg bg-slate-800 p-3">
-        <div className="mb-2 grid grid-cols-4 text-sm font-semibold text-slate-400">
-          <span>Player</span>
-          <span className="text-right">Played</span>
-          <span className="text-right">Goal</span>
-          <span className="text-right">Predicted</span>
+        <div className="mb-2 grid grid-cols-6 text-sm font-semibold text-slate-400">
+          <span className="col-span-2">Player</span>
+          <span className="text-right">Game</span>
+          <span className="text-right">Day</span>
+          <span className="text-right">Tourn</span>
+          <span className="text-right">Pred</span>
         </div>
         {[...players]
           .filter((p) => p.active)
           .sort((a, b) => (predicted[b.id] ?? 0) - (predicted[a.id] ?? 0))
           .map((p) => (
-            <div key={p.id} className="grid grid-cols-4 border-t border-slate-700 py-1">
-              <span className="flex items-center gap-2">
+            <div key={p.id} className="grid grid-cols-6 border-t border-slate-700 py-1">
+              <span className="col-span-2 flex items-center gap-2">
                 <span
                   className={`h-2 w-2 rounded-full ${
                     p.gender === 'MMP' ? 'bg-sky-400' : 'bg-fuchsia-400'
@@ -280,11 +298,17 @@ function ActiveGame() {
                 {p.name}
               </span>
               <span className="text-right tabular-nums">{game.played[p.id] ?? 0}</span>
-              <span className="text-right tabular-nums text-slate-400">
-                {Math.round(targets[p.id] ?? 0)}
+              <span className="text-right tabular-nums text-slate-300">
+                {dayPlayed[p.id] ?? 0}
+              </span>
+              <span className="text-right tabular-nums text-slate-300">
+                {tournamentPlayed[p.id] ?? 0}
               </span>
               <span className="text-right tabular-nums text-slate-400">
-                {predicted[p.id] ?? 0}
+                {predicted[p.id] ?? 0}{' '}
+                <span className="text-xs text-slate-500">
+                  /{Math.round(targets[p.id] ?? 0)}
+                </span>
               </span>
             </div>
           ))}
@@ -351,12 +375,4 @@ function Segmented<T extends string>({
       ))}
     </div>
   );
-}
-
-function modeLabel(mode: number): string {
-  if (mode < 0.25) return 'Competitive';
-  if (mode < 0.4) return 'Mostly competitive';
-  if (mode <= 0.6) return 'Equal time';
-  if (mode < 0.75) return 'Mostly resting';
-  return 'Non-competitive';
 }

@@ -211,13 +211,12 @@ PWA needs for install + offline. Testing PWA install locally requires
 
 ```
 src/
-  domain/        pure TS, no React, fully unit-tested (31 tests):
+  domain/        pure TS, no React, fully unit-tested (35 tests):
                    types, rules (ABBA/possession), fold (deriveState),
-                   engine (targets/selectLine/predictGame), doctor
+                   engine (targets/selectLine/predictGame), aggregate, doctor
   persistence/   Repository interface + LocalRepository
   store/         Zustand store: event log + roster + all actions
-  screens/       Roster (built), Game (built), Predictor (stub)
-  components/    shared UI
+  screens/       Roster, Game, Predictor (all built)
 docs/DATA_MODEL.md   deep spec: events, fold, sync merge, rotation engine
 ```
 
@@ -226,15 +225,16 @@ docs/DATA_MODEL.md   deep spec: events, fold, sync merge, rotation engine
 Rev-1 core is working: enter a roster, start a game, and the Game screen calls
 lines (correct 4:3 / 3:4 ratio, O/D-aware, deficit-based rotation, once-per-half
 urgency), tracks score/possession/gender automatically, records points, supports
-undo + injury subs + line edits, shows per-player played/goal/predicted, and
-persists to localStorage. Still to do: Supabase sync + longest-chain merge, the
-Predictor screen, day/tournament aggregate counts across games, and handler/
-cutter roles.
+undo + injury subs + line edits, shows per-player game/day/tournament counts plus
+goal/predicted, and persists to localStorage. Games group into days (by date) and
+tournaments (start a new one from the Game screen). The Predictor screen
+simulates a full game from the roster + settings, with O-only / D-only views.
+Still to do: Supabase sync + longest-chain merge and handler/cutter roles.
 
 ## 8. Roadmap
 
-- **Rev 1 (MVP, mostly done):** Roster + Game screens, rotation engine,
-  gender/possession tracking, Doctor, per-player counts, localStorage, PWA.
-- **Rev 1.1:** Supabase sync with longest-chain merge; day/tournament aggregate
-  counts across games.
-- **Rev 2:** Predictor screen; handler/cutter roles; richer conflict UI.
+- **Rev 1 (MVP, done):** Roster + Game + Predictor screens, rotation engine,
+  gender/possession tracking, Doctor, game/day/tournament counts, localStorage,
+  PWA.
+- **Rev 1.1:** Supabase sync with longest-chain merge.
+- **Rev 2:** handler/cutter roles; richer conflict UI; real app icons.

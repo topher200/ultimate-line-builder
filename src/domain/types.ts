@@ -67,6 +67,7 @@ export interface GameMeta {
   gameId: Id;
   name: string;
   createdAt: number;
+  tournamentId: Id;
 }
 
 /** Everything on-screen derives from folding the event log into this. */

@@ -145,14 +145,21 @@ function rankCandidates(
   return scored;
 }
 
+export interface PredictOptions {
+  /** Force every simulated point to this possession (for O-only / D-only). */
+  forcePossession?: Possession;
+}
+
 /**
  * Predicted points per player: run the selection policy forward over the
- * remaining points, assuming O and D points trade (possession alternates).
+ * remaining points, assuming O and D points trade (possession alternates)
+ * unless a possession is forced.
  */
 export function predictGame(
   state: GameState,
   players: Player[],
   targets: Record<Id, number>,
+  opts: PredictOptions = {},
 ): Record<Id, number> {
   const predicted: Record<Id, number> = {};
   for (const p of players) predicted[p.id] = state.played[p.id] ?? 0;
@@ -162,6 +169,7 @@ export function predictGame(
     played: { ...state.played },
     playedThisHalf: { ...state.playedThisHalf },
     score: { ...state.score },
+    nextPossession: opts.forcePossession ?? state.nextPossession,
   };
 
   let guard = 0;
@@ -178,22 +186,28 @@ export function predictGame(
       sim.playedThisHalf[entry.playerId] =
         (sim.playedThisHalf[entry.playerId] ?? 0) + 1;
     }
-    advanceSim(sim, halfLen);
+    advanceSim(sim, halfLen, opts.forcePossession);
   }
   return predicted;
 }
 
-function advanceSim(sim: GameState, halfLen: number): void {
+function advanceSim(
+  sim: GameState,
+  halfLen: number,
+  forcePossession?: Possession,
+): void {
   sim.totalPoints += 1;
   sim.pointsPlayedThisHalf += 1;
   if (sim.half === 1 && sim.pointsPlayedThisHalf >= halfLen) {
     sim.half = 2;
     sim.pointsPlayedThisHalf = 0;
     for (const id of Object.keys(sim.playedThisHalf)) sim.playedThisHalf[id] = 0;
-    sim.nextPossession = sim.startingPossession === 'O' ? 'D' : 'O';
+    sim.nextPossession =
+      forcePossession ?? (sim.startingPossession === 'O' ? 'D' : 'O');
   } else {
-    // Points trade: possession alternates.
-    sim.nextPossession = sim.nextPossession === 'O' ? 'D' : 'O';
+    // Points trade: possession alternates unless forced.
+    sim.nextPossession =
+      forcePossession ?? (sim.nextPossession === 'O' ? 'D' : 'O');
   }
   sim.nextMajority = majorityForPoint(
     sim.pointsPlayedThisHalf + 1,
