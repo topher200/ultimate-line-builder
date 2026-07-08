@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore.ts';
 import { freshGameState } from '../domain/fold.ts';
 import { computeTargets, predictGame } from '../domain/engine.ts';
+import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
 import { ModeSlider } from '../components/ModeSlider.tsx';
 import type { MajorityGender, Possession } from '../domain/types.ts';
 
@@ -12,7 +13,7 @@ export function PredictorScreen() {
 
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
-  const [expectedPoints, setExpectedPoints] = useState(20);
+  const [expectedPoints, setExpectedPoints] = useState(DEFAULT_EXPECTED_POINTS);
   const [mode, setMode] = useState(0);
   const [view, setView] = useState<View>('all');
 

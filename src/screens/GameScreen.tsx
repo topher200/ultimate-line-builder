@@ -4,6 +4,7 @@ import { deriveState } from '../domain/fold.ts';
 import { computeTargets, predictGame, selectLine } from '../domain/engine.ts';
 import { slotsForMajority } from '../domain/rules.ts';
 import { sameDay, sumPlayedAcross } from '../domain/aggregate.ts';
+import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
 import { ModeSlider } from '../components/ModeSlider.tsx';
 import type {
   Line,
@@ -28,7 +29,7 @@ function NewGamePanel({ onStarted }: { onStarted: () => void }) {
   const startNewTournament = useAppStore((s) => s.startNewTournament);
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
-  const [expectedPoints, setExpectedPoints] = useState(20);
+  const [expectedPoints, setExpectedPoints] = useState(DEFAULT_EXPECTED_POINTS);
   const [mode, setMode] = useState(0);
 
   const start = () => {
