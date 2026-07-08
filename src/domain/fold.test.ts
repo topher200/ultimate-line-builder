@@ -70,6 +70,25 @@ describe('deriveState', () => {
     expect(s.nextPossession).toBe('O');
   });
 
+  it('has an empty mode baseline before any ModeChanged', () => {
+    const s = deriveState([start, point(['a'], 'us', 'D', 'M')]);
+    expect(s.modeBaseline).toEqual({ totalPoints: 0, played: {} });
+  });
+
+  it('snapshots the mode baseline at the latest ModeChanged', () => {
+    const s = deriveState([
+      start,
+      point(['a'], 'us', 'D', 'M'),
+      point(['a', 'b'], 'them', 'O', 'W'),
+      ev({ kind: 'ModeChanged', value: 0.5 }),
+      point(['c'], 'us', 'D', 'M'),
+    ]);
+    // Baseline is pinned to the moment the mode changed (2 points in), not now.
+    expect(s.modeBaseline.totalPoints).toBe(2);
+    expect(s.modeBaseline.played).toEqual({ a: 2, b: 1 });
+    expect(s.totalPoints).toBe(3);
+  });
+
   it('credits both players on an injury sub (>7 entries)', () => {
     const inj = ev({
       kind: 'PointCompleted',

@@ -5,6 +5,7 @@ import type {
   Id,
   LineupEntry,
   Mode,
+  ModeBaseline,
   Player,
   PointContext,
   Possession,
@@ -27,33 +28,67 @@ export function weightForMode(competitiveness: number, mode: Mode): number {
   return Math.max(w, 0.001);
 }
 
+const NO_BASELINE: ModeBaseline = { totalPoints: 0, played: {} };
+
 /**
- * Per-player goal: how many points we want them to play this game. Computed
- * within each gender pool so goals stay achievable given the 4:3 / 3:4 ratio.
- * (O/D refinement is intentionally deferred; selection still enforces it.)
+ * Per-player goal: how many points we want them to play this game.
+ *
+ * Players only ever play with their own line (an O point is played by the O
+ * line, a D point by the D line), so goals are always scoped per (line, gender)
+ * pool over that line's share of the game. This keeps "predicted / goal"
+ * consistent even when the two lines are different sizes. Mode only changes the
+ * weighting within a pool, never who is in it.
+ *
+ * Goals distribute the points remaining after the mode baseline (the moment the
+ * mode was last set) on top of what each player had already played then, so
+ * changing the mode re-plans from that point forward instead of rewriting the
+ * whole-game goal. With the default (start-of-game) baseline this is a plain
+ * whole-game goal. `oShare` is the expected fraction of points played on offense
+ * (defaults to an even split, which self-corrects as points fall).
  */
 export function computeTargets(
   players: Player[],
   expectedPoints: number,
   mode: Mode,
+  oShare = 0.5,
+  baseline: ModeBaseline = NO_BASELINE,
 ): Record<Id, number> {
   const active = players.filter((p) => p.active);
   const targets: Record<Id, number> = {};
+  const remaining = Math.max(0, expectedPoints - baseline.totalPoints);
+  const remO = remaining * oShare;
+  const remD = remaining - remO;
+
   for (const gender of ['MMP', 'WMP'] as Gender[]) {
-    const pool = active.filter((p) => p.gender === gender);
-    const slotsPerPoint = averageSlots(gender, expectedPoints);
-    const totalSlots = slotsPerPoint * expectedPoints;
-    const weights = pool.map((p) => weightForMode(p.competitiveness, mode));
-    const sum = weights.reduce((a, b) => a + b, 0) || 1;
-    pool.forEach((p, i) => {
-      // A player can play at most every point.
-      targets[p.id] = Math.min(
-        expectedPoints,
-        (totalSlots * weights[i]) / sum,
-      );
-    });
+    const perPoint = averageSlots(gender, expectedPoints);
+    const ofGender = active.filter((p) => p.gender === gender);
+    const assign = (pool: Player[], remInScope: number) =>
+      assignPool(pool, perPoint, remInScope, mode, baseline.played, expectedPoints, targets);
+    assign(ofGender.filter((p) => p.line === 'O'), remO);
+    assign(ofGender.filter((p) => p.line === 'D'), remD);
   }
   return targets;
+}
+
+function assignPool(
+  pool: Player[],
+  perPointSlots: number,
+  remainingInScope: number,
+  mode: Mode,
+  baselinePlayed: Record<Id, number>,
+  cap: number,
+  targets: Record<Id, number>,
+): void {
+  if (pool.length === 0) return;
+  const weights = pool.map((p) => weightForMode(p.competitiveness, mode));
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  const remainingSlots = perPointSlots * remainingInScope;
+  pool.forEach((p, i) => {
+    const base = baselinePlayed[p.id] ?? 0;
+    // Head start plus this pool's share of the remaining points, capped at the
+    // whole game.
+    targets[p.id] = Math.min(cap, base + (remainingSlots * weights[i]) / sum);
+  });
 }
 
 export interface SelectionResult {
@@ -67,9 +102,12 @@ export interface SelectionResult {
 const URGENCY_WEIGHT = 1000;
 
 /**
- * Choose the line for the upcoming point: fill each gender's slots with the
- * eligible players furthest behind their target, honoring line preference and
- * the once-per-half rule.
+ * Choose the line for the upcoming point. Only the fielded line's players are
+ * eligible (never a mix of O and D); within each gender we take the players
+ * furthest behind their target, with a once-per-half urgency boost. The fielded
+ * line defaults to the one matching possession but the coach can call the other
+ * line manually (context.line). If the line is short a gender, the shortfall is
+ * flagged rather than backfilled from the other line.
  */
 export function selectLine(
   state: GameState,
@@ -78,27 +116,20 @@ export function selectLine(
   targets: Record<Id, number>,
 ): SelectionResult {
   const slots = slotsForMajority(context.majority);
-  const active = players.filter((p) => p.active);
+  const online = players.filter((p) => p.active && p.line === context.line);
   const lineup: LineupEntry[] = [];
   const reasons: Record<Id, string> = {};
   let short = false;
 
   const halfPointsLeft = estimateHalfPointsLeft(state);
-  const needingHalfPoint = active.filter(
+  const needingHalfPoint = online.filter(
     (p) => (state.playedThisHalf[p.id] ?? 0) === 0,
   ).length;
 
   for (const gender of ['MMP', 'WMP'] as Gender[]) {
     const need = gender === 'MMP' ? slots.MMP : slots.WMP;
-    const pool = active.filter((p) => p.gender === gender);
-    const ranked = rankCandidates(
-      pool,
-      context.possession,
-      state,
-      targets,
-      needingHalfPoint,
-      halfPointsLeft,
-    );
+    const pool = online.filter((p) => p.gender === gender);
+    const ranked = rankCandidates(pool, state, targets, needingHalfPoint, halfPointsLeft);
     const chosen = ranked.slice(0, need);
     if (chosen.length < need) short = true;
     for (const { player, reason } of chosen) {
@@ -112,7 +143,6 @@ export function selectLine(
 
 function rankCandidates(
   pool: Player[],
-  possession: Possession,
   state: GameState,
   targets: Record<Id, number>,
   needingHalfPoint: number,
@@ -125,15 +155,8 @@ function rankCandidates(
     const urgency = needsHalf
       ? (URGENCY_WEIGHT * needingHalfPoint) / Math.max(1, halfPointsLeft)
       : 0;
-    // Competitive line preference: matching-line players sort ahead.
-    const lineMatch = p.line === possession;
-    const linePref = state.mode < 0.5 && lineMatch ? 1e6 : 0;
-    const score = linePref + urgency + deficit;
-    const reason = needsHalf
-      ? 'needs a half point'
-      : lineMatch
-        ? 'owed a point'
-        : 'cross-line fill';
+    const score = urgency + deficit;
+    const reason = needsHalf ? 'needs a half point' : 'owed a point';
     return { player: p, reason, score };
   });
   scored.sort(
@@ -178,6 +201,8 @@ export function predictGame(
     const context: PointContext = {
       possession: sim.nextPossession,
       majority: sim.nextMajority,
+      // The simulation fields the line matching possession (no manual calls).
+      line: sim.nextPossession,
     };
     const { lineup } = selectLine(sim, players, context, targets);
     for (const entry of lineup) {
