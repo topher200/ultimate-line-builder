@@ -15,8 +15,11 @@ export function PlayingTimeScreen() {
   const players = useAppStore((s) => s.players);
   const events = useAppStore((s) => s.events);
   const games = useAppStore((s) => s.games);
+  const tournaments = useAppStore((s) => s.tournaments);
   const logs = useAppStore((s) => s.logs);
   const currentGameId = useAppStore((s) => s.currentGameId);
+  const meta = games.find((g) => g.gameId === currentGameId);
+  const tournament = tournaments.find((t) => t.id === meta?.tournamentId);
 
   const [genderView, setGenderView] = useState<GenderView>('ALL');
   const [lineView, setLineView] = useState<LineView>('ALL');
@@ -47,9 +50,27 @@ export function PlayingTimeScreen() {
     .filter((p) => matchesView(p, genderView, lineView))
     .sort((a, b) => (predicted[b.id] ?? 0) - (predicted[a.id] ?? 0));
 
+  if (!currentGameId || events.length === 0) {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+        <h1 className="text-2xl font-bold">Playing time</h1>
+        <p className="rounded-lg bg-slate-800 p-6 text-center text-slate-400">
+          Load a game from the Games tab to see playing time and predictions.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <h1 className="text-2xl font-bold">Playing time</h1>
+      <div>
+        <h1 className="text-2xl font-bold">Playing time</h1>
+        <p className="text-sm text-slate-400">
+          {meta?.ourTeam} vs {meta?.theirTeam}
+          {tournament && <> &middot; {tournament.name}</>} &middot; predictions are
+          for this game
+        </p>
+      </div>
 
       <GameSettings />
       <ViewFilterBar
