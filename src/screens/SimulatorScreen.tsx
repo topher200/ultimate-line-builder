@@ -2,13 +2,15 @@ import { useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
 import { computeTargets, simulateGame, type SimulatedPoint } from '../domain/engine.ts';
-import { modeLabel } from '../components/ModeSlider.tsx';
+import { ModeSlider } from '../components/ModeSlider.tsx';
 import type { Player } from '../domain/types.ts';
 
 export function SimulatorScreen() {
   const players = useAppStore((s) => s.players);
   const events = useAppStore((s) => s.events);
   const currentGameId = useAppStore((s) => s.currentGameId);
+  const setMode = useAppStore((s) => s.setMode);
+  const setExpectedPoints = useAppStore((s) => s.setExpectedPoints);
 
   const { game, points } = useMemo(() => {
     const g = deriveState(events);
@@ -32,11 +34,9 @@ export function SimulatorScreen() {
       <div>
         <h1 className="text-2xl font-bold">Simulator</h1>
         <p className="text-sm text-slate-400">
-          Plays the rest of this game out point by point in{' '}
-          <span className="font-semibold text-slate-200">{modeLabel(game.mode)}</span>{' '}
-          mode, trading O and D, from the current score and next point. The number
-          by each name is how many points they'll have played this game after that
-          point.
+          Plays the rest of this game out point by point, trading O and D, from
+          the current score and next point. The number by each name is how many
+          points they'll have played this game through that point.
         </p>
       </div>
 
@@ -49,6 +49,21 @@ export function SimulatorScreen() {
           {points.length} point{points.length === 1 ? '' : 's'} left of{' '}
           {game.expectedPoints}
         </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 rounded-lg bg-slate-800 p-3">
+        <label className="flex items-center gap-2 text-sm">
+          Expected pts
+          <input
+            type="number"
+            min={1}
+            max={40}
+            value={game.expectedPoints}
+            className="w-16 rounded bg-slate-700 px-2 py-1"
+            onChange={(e) => setExpectedPoints(Number(e.target.value))}
+          />
+        </label>
+        <ModeSlider value={game.mode} onChange={setMode} className="flex-1" />
       </div>
 
       {points.length === 0 ? (
