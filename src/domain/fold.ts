@@ -99,7 +99,7 @@ export function deriveState(events: EventEnvelope[]): GameState {
     startingPossession,
     lastScoredBy,
   });
-  const baseMajority = majorityForPoint(pointsPlayedThisHalf + 1, startingMajority);
+  const baseMajority = majorityForPoint(totalPoints + 1, startingMajority);
 
   return {
     expectedPoints,

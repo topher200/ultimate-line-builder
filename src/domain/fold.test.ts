@@ -124,7 +124,7 @@ describe('deriveState', () => {
     expect(s.pointsPlayedThisHalf).toBe(0);
     expect(s.playedThisHalf).toEqual({ a: 0 });
     expect(s.nextPossession).toBe('O'); // started game on D -> half opens O
-    expect(s.nextMajority).toBe('M'); // half opens on the game's starting majority
+    expect(s.nextMajority).toBe('W'); // ratio pattern continues across half: point 2 = W
   });
 
   it('honors a pending majority override for the next point only', () => {

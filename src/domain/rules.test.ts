@@ -12,9 +12,11 @@ describe('majorityForPoint (ABBA)', () => {
     expect(seq).toEqual(['W', 'M', 'M', 'W', 'W']);
   });
 
-  it('opens the second half on the same majority as the game start', () => {
-    // Second half restarts pointInHalf at 1.
+  it('keys off the whole-game point number, so halftime does not restart it', () => {
+    // Point 1 opens on the starting majority; the cycle then runs unbroken
+    // regardless of where halftime falls.
     expect(majorityForPoint(1, 'W')).toBe('W');
+    expect(majorityForPoint(5, 'W')).toBe('W');
   });
 });
 

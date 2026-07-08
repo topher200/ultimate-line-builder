@@ -302,10 +302,7 @@ function advanceSim(
     sim.nextPossession =
       forcePossession ?? (sim.nextPossession === 'O' ? 'D' : 'O');
   }
-  sim.nextMajority = majorityForPoint(
-    sim.pointsPlayedThisHalf + 1,
-    sim.startingMajority,
-  );
+  sim.nextMajority = majorityForPoint(sim.totalPoints + 1, sim.startingMajority);
 }
 
 function estimateHalfPointsLeft(state: GameState): number {
