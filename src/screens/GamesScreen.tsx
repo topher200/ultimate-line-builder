@@ -4,25 +4,43 @@ import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
 import { ModeSlider } from '../components/ModeSlider.tsx';
 import { Segmented } from '../components/Segmented.tsx';
+import { InlineEdit } from '../components/InlineEdit.tsx';
 import {
   DEFAULT_EXPECTED_POINTS,
   DEFAULT_OUR_TEAM,
   DEFAULT_THEIR_TEAM,
 } from '../domain/defaults.ts';
-import type { GameMeta, MajorityGender, Possession } from '../domain/types.ts';
+import type {
+  EventEnvelope,
+  GameMeta,
+  MajorityGender,
+  Possession,
+  Tournament,
+} from '../domain/types.ts';
 
 export function GamesScreen() {
+  const tournaments = useAppStore((s) => s.tournaments);
   const games = useAppStore((s) => s.games);
   const logs = useAppStore((s) => s.logs);
   const currentGameId = useAppStore((s) => s.currentGameId);
+  const currentTournamentId = useAppStore((s) => s.currentTournamentId);
   const loadGame = useAppStore((s) => s.loadGame);
+  const createTournament = useAppStore((s) => s.createTournament);
+  const renameTournament = useAppStore((s) => s.renameTournament);
+  const setCurrentTournament = useAppStore((s) => s.setCurrentTournament);
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 
-  const sorted = useMemo(
-    () => [...games].sort((a, b) => b.createdAt - a.createdAt),
-    [games],
-  );
+  const grouped = useMemo(() => {
+    return [...tournaments]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((t) => ({
+        tournament: t,
+        games: games
+          .filter((g) => g.tournamentId === t.id)
+          .sort((a, b) => b.createdAt - a.createdAt),
+      }));
+  }, [tournaments, games]);
 
   const open = (gameId: string) => {
     loadGame(gameId);
@@ -45,27 +63,97 @@ export function GamesScreen() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Games</h1>
-        <button
-          className="rounded bg-emerald-600 px-4 py-2 font-semibold"
-          onClick={() => setCreating(true)}
-        >
-          New game
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="rounded bg-slate-700 px-3 py-2 text-sm font-semibold"
+            onClick={() => createTournament('')}
+          >
+            New tournament
+          </button>
+          <button
+            className="rounded bg-emerald-600 px-4 py-2 font-semibold"
+            onClick={() => setCreating(true)}
+          >
+            New game
+          </button>
+        </div>
       </div>
 
-      {sorted.length === 0 && (
+      {grouped.map(({ tournament, games: tGames }) => (
+        <TournamentSection
+          key={tournament.id}
+          tournament={tournament}
+          games={tGames}
+          logs={logs}
+          currentGameId={currentGameId}
+          isCurrent={tournament.id === currentTournamentId}
+          onRename={(name) => renameTournament(tournament.id, name)}
+          onMakeCurrent={() => setCurrentTournament(tournament.id)}
+          onOpen={open}
+        />
+      ))}
+
+      {grouped.length === 0 && (
         <p className="rounded-lg bg-slate-800 p-6 text-center text-slate-400">
           No games yet. Start one to begin calling lines.
         </p>
       )}
+    </div>
+  );
+}
 
-      {sorted.map((g) => (
+function TournamentSection({
+  tournament,
+  games,
+  logs,
+  currentGameId,
+  isCurrent,
+  onRename,
+  onMakeCurrent,
+  onOpen,
+}: {
+  tournament: Tournament;
+  games: GameMeta[];
+  logs: Record<string, EventEnvelope[]>;
+  currentGameId: string | null;
+  isCurrent: boolean;
+  onRename: (name: string) => void;
+  onMakeCurrent: () => void;
+  onOpen: (gameId: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <InlineEdit
+          value={tournament.name}
+          onChange={onRename}
+          className="text-lg font-bold"
+        />
+        {isCurrent ? (
+          <span className="rounded bg-emerald-800 px-2 py-0.5 text-xs font-semibold text-emerald-200">
+            Current
+          </span>
+        ) : (
+          <button
+            className="text-xs text-slate-400 underline"
+            onClick={onMakeCurrent}
+          >
+            Make current
+          </button>
+        )}
+      </div>
+      {games.length === 0 && (
+        <p className="rounded-lg bg-slate-800/60 p-3 text-sm text-slate-500">
+          No games in this tournament yet.
+        </p>
+      )}
+      {games.map((g) => (
         <GameRow
           key={g.gameId}
           game={g}
           state={deriveState(logs[g.gameId] ?? [])}
           current={g.gameId === currentGameId}
-          onOpen={() => open(g.gameId)}
+          onOpen={() => onOpen(g.gameId)}
         />
       ))}
     </div>
@@ -124,7 +212,9 @@ function NewGameForm({
   onCancel: () => void;
 }) {
   const newGame = useAppStore((s) => s.newGame);
-  const startNewTournament = useAppStore((s) => s.startNewTournament);
+  const tournaments = useAppStore((s) => s.tournaments);
+  const currentTournamentId = useAppStore((s) => s.currentTournamentId);
+  const current = tournaments.find((t) => t.id === currentTournamentId);
   const [ourTeam, setOurTeam] = useState(DEFAULT_OUR_TEAM);
   const [theirTeam, setTheirTeam] = useState(DEFAULT_THEIR_TEAM);
   const [possession, setPossession] = useState<Possession>('D');
@@ -132,8 +222,7 @@ function NewGameForm({
   const [expectedPoints, setExpectedPoints] = useState(DEFAULT_EXPECTED_POINTS);
   const [mode, setMode] = useState(0);
 
-  const start = (newTournament: boolean) => {
-    if (newTournament) startNewTournament();
+  const start = () => {
     newGame({
       name: new Date().toLocaleString(),
       ourTeam: ourTeam.trim() || DEFAULT_OUR_TEAM,
@@ -154,6 +243,11 @@ function NewGameForm({
           Cancel
         </button>
       </div>
+
+      <p className="text-sm text-slate-400">
+        In tournament <span className="font-semibold text-slate-200">{current?.name}</span>.
+        Switch or add a tournament on the Games list.
+      </p>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Our team">
@@ -206,15 +300,9 @@ function NewGameForm({
 
       <button
         className="rounded bg-emerald-600 py-3 text-lg font-semibold"
-        onClick={() => start(false)}
+        onClick={start}
       >
         Start game
-      </button>
-      <button
-        className="rounded bg-slate-700 py-2 text-sm text-slate-300"
-        onClick={() => start(true)}
-      >
-        Start as a new tournament
       </button>
     </div>
   );

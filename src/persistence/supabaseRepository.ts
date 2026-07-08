@@ -1,4 +1,10 @@
-import type { EventEnvelope, GameMeta, Id, Roster } from '../domain/types.ts';
+import type {
+  EventEnvelope,
+  GameMeta,
+  Id,
+  Roster,
+  Tournament,
+} from '../domain/types.ts';
 import type { Repository } from './repository.ts';
 import { getSupabase } from './supabaseClient.ts';
 import { DEFAULT_OUR_TEAM, DEFAULT_THEIR_TEAM } from '../domain/defaults.ts';
@@ -62,21 +68,44 @@ export class SupabaseRepository implements Repository {
     if (error) throw error;
   }
 
+  async listTournaments(): Promise<Tournament[]> {
+    const { data, error } = await getSupabase()
+      .from('tournaments')
+      .select('id, name, created_at')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      createdAt: t.created_at,
+    }));
+  }
+
+  async saveTournaments(tournaments: Tournament[]): Promise<void> {
+    if (tournaments.length === 0) return;
+    const { error } = await getSupabase().from('tournaments').upsert(
+      tournaments.map((t) => ({
+        id: t.id,
+        name: t.name,
+        created_at: t.createdAt,
+      })),
+    );
+    if (error) throw error;
+  }
+
   async listGames(): Promise<GameMeta[]> {
     const { data, error } = await getSupabase()
       .from('games')
-      .select('game_id, name, created_at, tournament_id')
+      .select('game_id, name, created_at, tournament_id, our_team, their_team')
       .order('created_at', { ascending: true });
     if (error) throw error;
-    // Team names are not yet mirrored as columns; default them here so cloud
-    // games stay well-formed. Local metadata wins in the reconcile merge.
     return (data ?? []).map((g) => ({
       gameId: g.game_id,
       name: g.name,
       createdAt: g.created_at,
       tournamentId: g.tournament_id,
-      ourTeam: DEFAULT_OUR_TEAM,
-      theirTeam: DEFAULT_THEIR_TEAM,
+      ourTeam: g.our_team ?? DEFAULT_OUR_TEAM,
+      theirTeam: g.their_team ?? DEFAULT_THEIR_TEAM,
     }));
   }
 
@@ -88,6 +117,8 @@ export class SupabaseRepository implements Repository {
         name: g.name,
         created_at: g.createdAt,
         tournament_id: g.tournamentId,
+        our_team: g.ourTeam,
+        their_team: g.theirTeam,
       })),
     );
     if (error) throw error;

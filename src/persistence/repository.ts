@@ -1,8 +1,16 @@
-import type { EventEnvelope, GameMeta, Id, Roster } from '../domain/types.ts';
+import type {
+  EventEnvelope,
+  GameMeta,
+  Id,
+  Roster,
+  Tournament,
+} from '../domain/types.ts';
 
 export interface Repository {
   loadRoster(): Promise<Roster | null>;
   saveRoster(roster: Roster): Promise<void>;
+  listTournaments(): Promise<Tournament[]>;
+  saveTournaments(tournaments: Tournament[]): Promise<void>;
   listGames(): Promise<GameMeta[]>;
   saveGames(games: GameMeta[]): Promise<void>;
   loadLog(gameId: Id): Promise<EventEnvelope[]>;
@@ -12,6 +20,7 @@ export interface Repository {
 
 const KEY = {
   roster: 'ulb:roster',
+  tournaments: 'ulb:tournaments',
   games: 'ulb:games',
   log: (gameId: Id) => `ulb:log:${gameId}`,
 };
@@ -24,6 +33,14 @@ export class LocalRepository implements Repository {
 
   async saveRoster(roster: Roster): Promise<void> {
     writeJson(KEY.roster, roster);
+  }
+
+  async listTournaments(): Promise<Tournament[]> {
+    return readJson<Tournament[]>(KEY.tournaments) ?? [];
+  }
+
+  async saveTournaments(tournaments: Tournament[]): Promise<void> {
+    writeJson(KEY.tournaments, tournaments);
   }
 
   async listGames(): Promise<GameMeta[]> {
