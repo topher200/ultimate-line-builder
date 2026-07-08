@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '../store/useAppStore.ts';
 import { runDoctor } from '../domain/doctor.ts';
+import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
 import { parseRosterText } from '../domain/rosterImport.ts';
 import type { Gender, Line } from '../domain/types.ts';
 
@@ -29,7 +30,7 @@ export function RosterScreen() {
     }
   };
 
-  const warnings = runDoctor(players, 20);
+  const warnings = runDoctor(players, DEFAULT_EXPECTED_POINTS);
   const sorted = [...players]
     .filter((p) => genderView === 'ALL' || p.gender === genderView)
     .filter((p) => lineView === 'ALL' || p.line === lineView)

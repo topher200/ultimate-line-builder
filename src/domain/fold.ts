@@ -1,3 +1,4 @@
+import { DEFAULT_EXPECTED_POINTS } from './defaults.ts';
 import { majorityForPoint, possessionForPoint } from './rules.ts';
 import type {
   EventEnvelope,
@@ -7,7 +8,7 @@ import type {
 } from './types.ts';
 
 const DEFAULTS = {
-  expectedPoints: 20,
+  expectedPoints: DEFAULT_EXPECTED_POINTS,
   mode: 0,
   startingPossession: 'O' as Possession,
   startingMajority: 'M' as MajorityGender,
