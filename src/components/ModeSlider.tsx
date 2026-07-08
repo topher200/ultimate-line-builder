@@ -1,4 +1,4 @@
-export function modeLabel(mode: number): string {
+function modeLabel(mode: number): string {
   if (mode < 0.25) return 'Competitive';
   if (mode < 0.4) return 'Mostly competitive';
   if (mode <= 0.6) return 'Equal time';
