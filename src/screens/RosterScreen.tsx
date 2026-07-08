@@ -3,6 +3,12 @@ import { useAppStore } from '../store/useAppStore.ts';
 import { runDoctor } from '../domain/doctor.ts';
 import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
 import { parseRosterText } from '../domain/rosterImport.ts';
+import { ViewFilterBar } from '../components/ViewFilterBar.tsx';
+import {
+  matchesView,
+  type GenderView,
+  type LineView,
+} from '../components/viewFilter.ts';
 import type { Gender, Line } from '../domain/types.ts';
 
 export function RosterScreen() {
@@ -17,8 +23,8 @@ export function RosterScreen() {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [importErrors, setImportErrors] = useState<string[]>([]);
-  const [genderView, setGenderView] = useState<'ALL' | Gender>('ALL');
-  const [lineView, setLineView] = useState<'ALL' | Line>('ALL');
+  const [genderView, setGenderView] = useState<GenderView>('ALL');
+  const [lineView, setLineView] = useState<LineView>('ALL');
 
   const runImport = () => {
     const { players: parsed, errors } = parseRosterText(importText);
@@ -32,8 +38,7 @@ export function RosterScreen() {
 
   const warnings = runDoctor(players, DEFAULT_EXPECTED_POINTS);
   const sorted = [...players]
-    .filter((p) => genderView === 'ALL' || p.gender === genderView)
-    .filter((p) => lineView === 'ALL' || p.line === lineView)
+    .filter((p) => matchesView(p, genderView, lineView))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -124,22 +129,14 @@ export function RosterScreen() {
       )}
 
       {players.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
-          <span className="text-sm font-semibold text-slate-400">View</span>
-          <Toggle
-            options={['ALL', 'MMP', 'WMP']}
-            value={genderView}
-            onChange={(v) => setGenderView(v as 'ALL' | Gender)}
-          />
-          <Toggle
-            options={['ALL', 'O', 'D']}
-            value={lineView}
-            onChange={(v) => setLineView(v as 'ALL' | Line)}
-          />
-          <span className="text-sm text-slate-500">
-            {sorted.length} of {players.length}
-          </span>
-        </div>
+        <ViewFilterBar
+          gender={genderView}
+          line={lineView}
+          onGender={setGenderView}
+          onLine={setLineView}
+          shown={sorted.length}
+          total={players.length}
+        />
       )}
 
       <div className="flex flex-col gap-2">
