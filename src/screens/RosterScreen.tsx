@@ -16,6 +16,8 @@ export function RosterScreen() {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [genderView, setGenderView] = useState<'ALL' | Gender>('ALL');
+  const [lineView, setLineView] = useState<'ALL' | Line>('ALL');
 
   const runImport = () => {
     const { players: parsed, errors } = parseRosterText(importText);
@@ -28,7 +30,10 @@ export function RosterScreen() {
   };
 
   const warnings = runDoctor(players, 20);
-  const sorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...players]
+    .filter((p) => genderView === 'ALL' || p.gender === genderView)
+    .filter((p) => lineView === 'ALL' || p.line === lineView)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -117,6 +122,25 @@ export function RosterScreen() {
         </div>
       )}
 
+      {players.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
+          <span className="text-sm font-semibold text-slate-400">View</span>
+          <Toggle
+            options={['ALL', 'MMP', 'WMP']}
+            value={genderView}
+            onChange={(v) => setGenderView(v as 'ALL' | Gender)}
+          />
+          <Toggle
+            options={['ALL', 'O', 'D']}
+            value={lineView}
+            onChange={(v) => setLineView(v as 'ALL' | Line)}
+          />
+          <span className="text-sm text-slate-500">
+            {sorted.length} of {players.length}
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {sorted.map((p) => (
           <div
@@ -173,6 +197,11 @@ export function RosterScreen() {
         {players.length === 0 && (
           <p className="p-6 text-center text-slate-400">
             Add players one at a time, or use Import to paste the whole team.
+          </p>
+        )}
+        {players.length > 0 && sorted.length === 0 && (
+          <p className="p-6 text-center text-slate-400">
+            No players match this view.
           </p>
         )}
       </div>
