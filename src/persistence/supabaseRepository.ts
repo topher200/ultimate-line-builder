@@ -1,6 +1,7 @@
 import type { EventEnvelope, GameMeta, Id, Roster } from '../domain/types.ts';
 import type { Repository } from './repository.ts';
 import { getSupabase } from './supabaseClient.ts';
+import { DEFAULT_OUR_TEAM, DEFAULT_THEIR_TEAM } from '../domain/defaults.ts';
 
 const ROSTER_ID = 'team';
 
@@ -67,11 +68,15 @@ export class SupabaseRepository implements Repository {
       .select('game_id, name, created_at, tournament_id')
       .order('created_at', { ascending: true });
     if (error) throw error;
+    // Team names are not yet mirrored as columns; default them here so cloud
+    // games stay well-formed. Local metadata wins in the reconcile merge.
     return (data ?? []).map((g) => ({
       gameId: g.game_id,
       name: g.name,
       createdAt: g.created_at,
       tournamentId: g.tournament_id,
+      ourTeam: DEFAULT_OUR_TEAM,
+      theirTeam: DEFAULT_THEIR_TEAM,
     }));
   }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { deriveState } from '../domain/fold.ts';
+import { DEFAULT_OUR_TEAM, DEFAULT_THEIR_TEAM } from '../domain/defaults.ts';
 import type {
   EventEnvelope,
   EventPayload,
@@ -71,12 +72,15 @@ interface AppState {
   // game
   newGame: (opts: {
     name: string;
+    ourTeam: string;
+    theirTeam: string;
     startingPossession: Possession;
     startingMajority: MajorityGender;
     expectedPoints: number;
     mode: Mode;
   }) => void;
   loadGame: (gameId: Id) => void;
+  updateGameMeta: (gameId: Id, patch: Partial<Pick<GameMeta, 'name' | 'ourTeam' | 'theirTeam'>>) => void;
   startNewTournament: () => void;
   recordPoint: (lineup: LineupEntry[], scoredBy: 'us' | 'them') => void;
   undoLastPoint: () => void;
@@ -101,7 +105,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     const { repo } = get();
     const roster = await repo.loadRoster();
-    const games = await repo.listGames();
+    const games = (await repo.listGames()).map(withTeamDefaults);
     const logs: Record<Id, EventEnvelope[]> = {};
     for (const g of games) logs[g.gameId] = await repo.loadLog(g.gameId);
     const currentGameId = games.at(-1)?.gameId ?? null;
@@ -145,6 +149,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       name: opts.name,
       createdAt: Date.now(),
       tournamentId: get().currentTournamentId,
+      ourTeam: opts.ourTeam,
+      theirTeam: opts.theirTeam,
     };
     const games = [...get().games, meta];
     void get().repo.saveGames(games);
@@ -166,6 +172,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   loadGame: (gameId) => {
     set({ currentGameId: gameId, events: get().logs[gameId] ?? [] });
+  },
+
+  updateGameMeta: (gameId, patch) => {
+    const games = get().games.map((g) =>
+      g.gameId === gameId ? { ...g, ...patch } : g,
+    );
+    set({ games });
+    void get().repo.saveGames(games);
+    pushRemote(() => remote!.saveGames(games));
   },
 
   startNewTournament: () => {
@@ -199,6 +214,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   overrideMajority: (value) =>
     appendEvent(get, set, { kind: 'MajorityOverridden', value }),
 }));
+
+/** Backfill team names on games persisted before those fields existed. */
+function withTeamDefaults(meta: GameMeta): GameMeta {
+  return {
+    ...meta,
+    ourTeam: meta.ourTeam || DEFAULT_OUR_TEAM,
+    theirTeam: meta.theirTeam || DEFAULT_THEIR_TEAM,
+  };
+}
 
 function persistRoster(
   get: () => AppState,
@@ -256,7 +280,7 @@ async function reconcileRemote(
     ]);
 
     const byId = new Map<Id, GameMeta>();
-    for (const g of remoteGames) byId.set(g.gameId, g);
+    for (const g of remoteGames) byId.set(g.gameId, withTeamDefaults(g));
     for (const g of get().games) byId.set(g.gameId, g);
     const games = [...byId.values()].sort((a, b) => a.createdAt - b.createdAt);
 

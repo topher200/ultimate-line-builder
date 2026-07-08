@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { RosterScreen } from './screens/RosterScreen.tsx';
+import { GamesScreen } from './screens/GamesScreen.tsx';
 import { GameScreen } from './screens/GameScreen.tsx';
 import { PredictorScreen } from './screens/PredictorScreen.tsx';
 import { PlayingTimeScreen } from './screens/PlayingTimeScreen.tsx';
 import { useAppStore } from './store/useAppStore.ts';
 
 const tabs = [
+  { to: '/games', label: 'Games' },
   { to: '/game', label: 'Game' },
   { to: '/playing-time', label: 'Playing Time' },
   { to: '/roster', label: 'Roster' },
@@ -33,7 +35,8 @@ export function App() {
     <div className="flex h-full flex-col bg-slate-900 text-slate-100">
       <main className="min-h-0 flex-1 overflow-y-auto">
         <Routes>
-          <Route path="/" element={<Navigate to="/game" replace />} />
+          <Route path="/" element={<Navigate to="/games" replace />} />
+          <Route path="/games" element={<GamesScreen />} />
           <Route path="/game" element={<GameScreen />} />
           <Route path="/playing-time" element={<PlayingTimeScreen />} />
           <Route path="/roster" element={<RosterScreen />} />
