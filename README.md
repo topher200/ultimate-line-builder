@@ -21,8 +21,8 @@ your head in the moment. A captain has to juggle:
   every active player should play at least once per half. You don't want to
   reach the end of the day and discover someone only played 5 points.
 - **Playing your best players more.** In competitive points your top players
-  should be out there. Example: Kaleb is the best D-line handler, so he should
-  be on the field for essentially every competitive D point.
+  should be out there. Example: your best D-line handler should be on the field
+  for essentially every competitive D point.
 - **Game competitiveness.** An even matchup is fully competitive. A planned
   blowout (16-seed vs 1-seed) or a game where you've fallen behind by 3+ is a
   chance to rest stars and give bench players time. The captain toggles this
@@ -108,8 +108,8 @@ The app tracks playing time per **game**, per **day**, and per **tournament**.
 ## 3. Playing-time strategy
 
 Each player has a **competitiveness rating** (0-100%): how much we want them on
-the field during competitive points. Kaleb might be 100%, Charles 10%, and 0% is
-allowed. The **game-competitiveness** control blends how ratings translate into
+the field during competitive points. A star might be 100%, a deep-bench player
+10%, and 0% is allowed. The **game-competitiveness** control blends how ratings translate into
 targets:
 
 - **Competitive** -- play time roughly proportional to competitiveness rating.
