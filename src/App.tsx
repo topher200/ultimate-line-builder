@@ -4,10 +4,12 @@ import { RosterScreen } from './screens/RosterScreen.tsx';
 import { GameScreen } from './screens/GameScreen.tsx';
 import { PredictorScreen } from './screens/PredictorScreen.tsx';
 import { SimulatorScreen } from './screens/SimulatorScreen.tsx';
+import { PlayingTimeScreen } from './screens/PlayingTimeScreen.tsx';
 import { useAppStore } from './store/useAppStore.ts';
 
 const tabs = [
   { to: '/game', label: 'Game' },
+  { to: '/playing-time', label: 'Playing Time' },
   { to: '/roster', label: 'Roster' },
   { to: '/predictor', label: 'Predictor' },
   { to: '/simulator', label: 'Simulator' },
@@ -35,6 +37,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/game" replace />} />
           <Route path="/game" element={<GameScreen />} />
+          <Route path="/playing-time" element={<PlayingTimeScreen />} />
           <Route path="/roster" element={<RosterScreen />} />
           <Route path="/predictor" element={<PredictorScreen />} />
           <Route path="/simulator" element={<SimulatorScreen />} />

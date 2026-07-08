@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore.ts';
-import { freshGameState } from '../domain/fold.ts';
+import { deriveState, freshGameState } from '../domain/fold.ts';
 import { computeTargets, predictGame } from '../domain/engine.ts';
-import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
-import { ModeSlider } from '../components/ModeSlider.tsx';
+import { GameSettings } from '../components/GameSettings.tsx';
 import type { MajorityGender, Possession } from '../domain/types.ts';
 
 type View = 'all' | 'O' | 'D';
 
 export function PredictorScreen() {
   const players = useAppStore((s) => s.players);
+  const events = useAppStore((s) => s.events);
 
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
-  const [expectedPoints, setExpectedPoints] = useState(DEFAULT_EXPECTED_POINTS);
-  const [mode, setMode] = useState(0);
   const [view, setView] = useState<View>('all');
+
+  // Expected points and competitiveness are the live game's, shared with the
+  // other screens; possession, ratio, and line view are Predictor what-ifs.
+  const { expectedPoints, mode } = useMemo(() => deriveState(events), [events]);
 
   const predicted = useMemo(() => {
     const game = freshGameState({
@@ -65,16 +67,6 @@ export function PredictorScreen() {
             onChange={setMajority}
           />
         </Field>
-        <Field label="Expected pts">
-          <input
-            type="number"
-            min={1}
-            max={40}
-            value={expectedPoints}
-            className="w-20 rounded bg-slate-700 px-3 py-2"
-            onChange={(e) => setExpectedPoints(Number(e.target.value))}
-          />
-        </Field>
         <Field label="View">
           <Segmented
             options={[
@@ -88,9 +80,7 @@ export function PredictorScreen() {
         </Field>
       </div>
 
-      <div className="rounded-lg bg-slate-800 p-3">
-        <ModeSlider value={mode} onChange={setMode} />
-      </div>
+      <GameSettings />
 
       <div className="flex flex-col gap-1 rounded-lg bg-slate-800 p-3">
         {shown.map((p) => (
