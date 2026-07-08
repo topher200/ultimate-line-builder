@@ -6,6 +6,7 @@ import { slotsForMajority } from '../domain/rules.ts';
 import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
 import { ModeSlider } from '../components/ModeSlider.tsx';
 import { GameSettings } from '../components/GameSettings.tsx';
+import { GameTimeline } from './GameTimeline.tsx';
 import type {
   Line,
   LineupEntry,
@@ -277,6 +278,8 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
       </div>
 
       <GameSettings />
+
+      <GameTimeline events={events} players={players} game={game} targets={targets} />
     </div>
   );
 }
