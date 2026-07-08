@@ -13,7 +13,7 @@ export function PredictorScreen() {
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
   const [expectedPoints, setExpectedPoints] = useState(20);
-  const [mode, setMode] = useState(0.5);
+  const [mode, setMode] = useState(0);
   const [view, setView] = useState<View>('all');
 
   const predicted = useMemo(() => {
@@ -38,8 +38,9 @@ export function PredictorScreen() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Predictor</h1>
       <p className="text-sm text-slate-400">
-        Simulate a game with the current roster and settings. Points trade
-        between O and D unless you pick a single line.
+        Project a whole game from the current roster and settings. O and D
+        points alternate through the game; switch the View to project a single
+        line instead.
       </p>
 
       <div className="flex flex-wrap gap-3 rounded-lg bg-slate-800 p-3">
