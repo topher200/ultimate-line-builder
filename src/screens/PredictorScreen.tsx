@@ -13,7 +13,7 @@ export function PredictorScreen() {
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
   const [expectedPoints, setExpectedPoints] = useState(20);
-  const [mode, setMode] = useState(0);
+  const [mode, setMode] = useState(0.5);
   const [view, setView] = useState<View>('all');
 
   const predicted = useMemo(() => {

@@ -3,12 +3,14 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { RosterScreen } from './screens/RosterScreen.tsx';
 import { GameScreen } from './screens/GameScreen.tsx';
 import { PredictorScreen } from './screens/PredictorScreen.tsx';
+import { SimulatorScreen } from './screens/SimulatorScreen.tsx';
 import { useAppStore } from './store/useAppStore.ts';
 
 const tabs = [
   { to: '/game', label: 'Game' },
   { to: '/roster', label: 'Roster' },
   { to: '/predictor', label: 'Predictor' },
+  { to: '/simulator', label: 'Simulator' },
 ];
 
 export function App() {
@@ -35,6 +37,7 @@ export function App() {
           <Route path="/game" element={<GameScreen />} />
           <Route path="/roster" element={<RosterScreen />} />
           <Route path="/predictor" element={<PredictorScreen />} />
+          <Route path="/simulator" element={<SimulatorScreen />} />
         </Routes>
       </main>
       <nav className="flex shrink-0 border-t border-slate-700">
