@@ -40,6 +40,10 @@ alter table rosters enable row level security;
 alter table games enable row level security;
 alter table events enable row level security;
 
+drop policy if exists "anon rosters" on rosters;
+drop policy if exists "anon games" on games;
+drop policy if exists "anon events" on events;
+
 create policy "anon rosters" on rosters for all to anon using (true) with check (true);
 create policy "anon games" on games for all to anon using (true) with check (true);
 create policy "anon events" on events for all to anon using (true) with check (true);
