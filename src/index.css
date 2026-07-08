@@ -8,8 +8,13 @@ body,
 
 body {
   margin: 0;
-  -webkit-user-select: none;
-  user-select: none;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+}
+
+/* Buttons are the primary tablet interaction; keep their labels from
+   highlighting on rapid taps. Everything else stays selectable. */
+button {
+  -webkit-user-select: none;
+  user-select: none;
 }
