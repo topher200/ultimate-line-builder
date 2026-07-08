@@ -32,6 +32,22 @@ function pushRemote(op: () => Promise<unknown>): void {
   void op().catch((e) => console.warn('[sync] push failed', e));
 }
 
+// Reconcile with the cloud mirror on reconnect and on foreground, catching up
+// any events whose push failed while offline. Re-pushing is idempotent (events
+// upsert by id), so a full re-sync is a safe catch-up.
+let syncTriggersAttached = false;
+function attachSyncTriggers(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+): void {
+  if (syncTriggersAttached || !remote || typeof window === 'undefined') return;
+  syncTriggersAttached = true;
+  window.addEventListener('online', () => void reconcileRemote(get, set));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void reconcileRemote(get, set);
+  });
+}
+
 interface AppState {
   repo: Repository;
   deviceId: string;
@@ -98,6 +114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       ready: true,
     });
     void reconcileRemote(get, set);
+    attachSyncTriggers(get, set);
   },
 
   addPlayer: (p) => {
@@ -225,11 +242,13 @@ function appendEvent(
  * merge each log, adopt the remote roster if we have none locally, and persist
  * the results. Runs only when configured; failures are logged, not surfaced.
  */
+let reconcileInFlight = false;
 async function reconcileRemote(
   get: () => AppState,
   set: (partial: Partial<AppState>) => void,
 ): Promise<void> {
-  if (!remote) return;
+  if (!remote || reconcileInFlight) return;
+  reconcileInFlight = true;
   try {
     const [remoteRoster, remoteGames] = await Promise.all([
       remote.loadRoster(),
@@ -264,5 +283,7 @@ async function reconcileRemote(
     });
   } catch (e) {
     console.warn('[sync] reconcile failed', e);
+  } finally {
+    reconcileInFlight = false;
   }
 }
