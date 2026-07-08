@@ -3,6 +3,7 @@ import {
   computeTargets,
   predictGame,
   selectLine,
+  simulateGame,
   weightForMode,
 } from './engine.ts';
 import type { GameState, Gender, Line, Player, PointContext } from './types.ts';
@@ -203,6 +204,44 @@ describe('predictGame', () => {
     expect(dOnly['mo1']).toBe(0);
     const total = Object.values(oOnly).reduce((a, b) => a + b, 0);
     expect(total).toBe(7 * 20);
+  });
+});
+
+describe('simulateGame', () => {
+  it('plays out every remaining point with a full lineup, trading O and D', () => {
+    const targets = computeTargets(roster, 20, 0);
+    const points = simulateGame(state({ mode: 0 }), roster, targets);
+    expect(points).toHaveLength(20);
+    expect(points[0].index).toBe(1);
+    expect(points.at(-1)!.index).toBe(20);
+    // Points trade from the starting possession (O, D, O, ...).
+    expect(points.map((p) => p.line).slice(0, 4)).toEqual(['O', 'D', 'O', 'D']);
+    // Each point fields exactly one line and 7 players.
+    for (const pt of points) {
+      const lines = new Set(pt.lineup.map((id) => roster.find((r) => r.id === id)!.line));
+      expect(lines).toEqual(new Set([pt.line]));
+      expect(pt.lineup).toHaveLength(7);
+    }
+  });
+
+  it('starts from the current score and only simulates remaining points', () => {
+    const targets = computeTargets(roster, 20, 0);
+    const points = simulateGame(state({ totalPoints: 18, mode: 0 }), roster, targets);
+    expect(points).toHaveLength(2);
+    expect(points[0].index).toBe(19);
+  });
+
+  it('counts a player up across the points they appear in', () => {
+    const targets = computeTargets(roster, 20, 0);
+    const points = simulateGame(state({ mode: 0 }), roster, targets);
+    // playedBefore rises by 1 each time a player is fielded again.
+    const seen: Record<string, number> = {};
+    for (const pt of points) {
+      for (const id of pt.lineup) {
+        expect(pt.playedBefore[id]).toBe(seen[id] ?? 0);
+        seen[id] = (seen[id] ?? 0) + 1;
+      }
+    }
   });
 });
 

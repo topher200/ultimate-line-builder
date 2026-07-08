@@ -3,7 +3,9 @@ import type {
   GameState,
   Gender,
   Id,
+  Line,
   LineupEntry,
+  MajorityGender,
   Mode,
   ModeBaseline,
   Player,
@@ -214,6 +216,72 @@ export function predictGame(
     advanceSim(sim, halfLen, opts.forcePossession);
   }
   return predicted;
+}
+
+export interface SimulatedPoint {
+  /** 1-based point number in the whole game. */
+  index: number;
+  half: 1 | 2;
+  possession: Possession;
+  majority: MajorityGender;
+  line: Line;
+  lineup: Id[];
+  /** A gender slot could not be filled from the fielded line. */
+  short: boolean;
+  /** Whole-game points each fielded player had played before this point. */
+  playedBefore: Record<Id, number>;
+}
+
+/**
+ * Play the rest of the game out point by point from the given state, trading
+ * possession (O then D then O...) and fielding the line that matches possession.
+ * Unlike predictGame, which returns per-player totals, this returns the ordered
+ * sequence of points with each point's lineup and running counts.
+ */
+export function simulateGame(
+  state: GameState,
+  players: Player[],
+  targets: Record<Id, number>,
+): SimulatedPoint[] {
+  const points: SimulatedPoint[] = [];
+  const sim: GameState = {
+    ...state,
+    played: { ...state.played },
+    playedThisHalf: { ...state.playedThisHalf },
+    score: { ...state.score },
+  };
+
+  let guard = 0;
+  const halfLen = Math.ceil(state.expectedPoints / 2);
+  while (sim.totalPoints < state.expectedPoints && guard++ < 200) {
+    const context: PointContext = {
+      possession: sim.nextPossession,
+      majority: sim.nextMajority,
+      line: sim.nextPossession,
+    };
+    const { lineup, short } = selectLine(sim, players, context, targets);
+    const playedBefore: Record<Id, number> = {};
+    for (const entry of lineup) {
+      playedBefore[entry.playerId] = sim.played[entry.playerId] ?? 0;
+    }
+    points.push({
+      index: sim.totalPoints + 1,
+      half: sim.half,
+      possession: sim.nextPossession,
+      majority: sim.nextMajority,
+      line: context.line,
+      lineup: lineup.map((l) => l.playerId),
+      short,
+      playedBefore,
+    });
+    for (const entry of lineup) {
+      sim.played[entry.playerId] = (sim.played[entry.playerId] ?? 0) + 1;
+      sim.playedThisHalf[entry.playerId] =
+        (sim.playedThisHalf[entry.playerId] ?? 0) + 1;
+    }
+    advanceSim(sim, halfLen);
+  }
+  return points;
 }
 
 function advanceSim(
