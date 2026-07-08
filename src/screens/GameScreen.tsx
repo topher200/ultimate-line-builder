@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
 import { computeTargets, selectLine } from '../domain/engine.ts';
-import { slotsForMajority } from '../domain/rules.ts';
+import { pointLabel, slotsForMajority } from '../domain/rules.ts';
 import { Segmented } from '../components/Segmented.tsx';
 import { InlineEdit } from '../components/InlineEdit.tsx';
 import { GameSettings } from '../components/GameSettings.tsx';
@@ -108,7 +108,16 @@ function ActiveGame() {
         </div>
         <div className="text-right text-sm text-slate-400">
           <div>Half {game.half}</div>
-          <div>Point {game.totalPoints + 1}</div>
+          <div>
+            Point {game.totalPoints + 1} &middot;{' '}
+            <span className="font-semibold text-slate-200">
+              {pointLabel(game.totalPoints + 1, game.nextMajority)}
+            </span>
+          </div>
+          <div className="text-xs text-slate-500">
+            Started on {game.startingPossession} &middot;{' '}
+            {pointLabel(1, game.startingMajority)}
+          </div>
         </div>
       </div>
 

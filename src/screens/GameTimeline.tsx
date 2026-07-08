@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { simulateGame, type SimulatedPoint } from '../domain/engine.ts';
 import { playedPoints, type PlayedPoint } from '../domain/history.ts';
+import { pointLabel } from '../domain/rules.ts';
 import type { EventEnvelope, GameState, Id, Line, Player } from '../domain/types.ts';
 
 /**
@@ -56,6 +57,14 @@ export function GameTimeline({
   );
 }
 
+function RatioBadge({ label }: { label: string }) {
+  return (
+    <span className="rounded bg-slate-700 px-2 py-0.5 text-xs font-bold text-slate-200">
+      {label}
+    </span>
+  );
+}
+
 function LineBadge({ line }: { line: Line }) {
   return (
     <span
@@ -100,6 +109,7 @@ function PlayedRow({
     <div className="rounded-lg bg-slate-800 p-3">
       <div className="mb-2 flex items-center gap-2 text-sm text-slate-400">
         <span className="w-10 font-semibold text-slate-200">#{pt.index}</span>
+        <RatioBadge label={pointLabel(pt.index, pt.majority)} />
         {line && <LineBadge line={line} />}
         <span
           className={`rounded px-2 py-0.5 text-xs font-bold ${
@@ -135,8 +145,8 @@ function SimRow({
     <div className="rounded-lg bg-slate-800/60 p-3">
       <div className="mb-2 flex items-center gap-2 text-sm text-slate-400">
         <span className="w-10 font-semibold text-slate-300">#{pt.index}</span>
+        <RatioBadge label={pointLabel(pt.index, pt.majority)} />
         <LineBadge line={pt.line} />
-        <span className="text-xs">{pt.majority === 'M' ? '4M:3W' : '3M:4W'}</span>
         <span className="text-xs text-slate-500">H{pt.half}</span>
         {pt.short && (
           <span className="text-xs font-semibold text-amber-300">short a slot</span>

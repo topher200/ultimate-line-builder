@@ -8,8 +8,8 @@ function modeLabel(mode: number): string {
 
 /**
  * Game-competitiveness control. Internally mode 0 = competitive and 1 = resting,
- * but the slider is drawn with competitive on the right (drag right to compete
- * harder), so the displayed position is inverted.
+ * but the slider is drawn as a competitiveness percentage (100% = go all out),
+ * so the displayed position is inverted.
  */
 export function ModeSlider({
   value,
@@ -20,9 +20,13 @@ export function ModeSlider({
   onChange: (mode: number) => void;
   className?: string;
 }) {
+  const competitiveness = Math.round((1 - value) * 100);
   return (
     <div className={`flex flex-col gap-1 ${className ?? ''}`}>
-      <span className="text-sm font-semibold">{modeLabel(value)}</span>
+      <span className="text-sm font-semibold">
+        Competitiveness {competitiveness}%{' '}
+        <span className="font-normal text-slate-400">({modeLabel(value)})</span>
+      </span>
       <div className="flex items-center gap-2">
         <span className="text-xs text-slate-500">Resting</span>
         <input

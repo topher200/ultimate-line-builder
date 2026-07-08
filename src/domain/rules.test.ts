@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { majorityForPoint, possessionForPoint, slotsForMajority } from './rules.ts';
+import {
+  majorityForPoint,
+  pointLabel,
+  possessionForPoint,
+  slotsForMajority,
+} from './rules.ts';
 
 describe('majorityForPoint (ABBA)', () => {
   it('follows A B B A A B B A starting on M', () => {
@@ -17,6 +22,18 @@ describe('majorityForPoint (ABBA)', () => {
     // regardless of where halftime falls.
     expect(majorityForPoint(1, 'W')).toBe('W');
     expect(majorityForPoint(5, 'W')).toBe('W');
+  });
+});
+
+describe('pointLabel', () => {
+  it('labels the M-start cycle M2, W1, W2, M1, M2', () => {
+    const seq = [1, 2, 3, 4, 5].map((p) => pointLabel(p, majorityForPoint(p, 'M')));
+    expect(seq).toEqual(['M2', 'W1', 'W2', 'M1', 'M2']);
+  });
+
+  it('reflects an overridden majority in the letter, keeping the position digit', () => {
+    // Position 2 is normally W1; overriding the majority to M yields M1.
+    expect(pointLabel(2, 'M')).toBe('M1');
   });
 });
 

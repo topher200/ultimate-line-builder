@@ -276,11 +276,11 @@ function NewGameForm({
           onChange={setPossession}
         />
       </Field>
-      <Field label="First point ratio">
+      <Field label="Start the ratio on">
         <Segmented
           options={[
-            { value: 'M', label: '4 MMP : 3 WMP' },
-            { value: 'W', label: '3 MMP : 4 WMP' },
+            { value: 'M', label: 'M2 (4M : 3W)' },
+            { value: 'W', label: 'W2 (3M : 4W)' },
           ]}
           value={majority}
           onChange={setMajority}

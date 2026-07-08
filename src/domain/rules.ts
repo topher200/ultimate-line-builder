@@ -24,6 +24,21 @@ export function majorityForPoint(
     : oppositeMajority(startingMajority);
 }
 
+/**
+ * The gender-ratio label for a point, e.g. 'M2'. The letter is the point's
+ * majority gender; the digit is which of the pair it is within the ABBA cycle
+ * (2 then 1). For an M start the whole-game sequence is M2, W1, W2, M1, M2, ...
+ * Overriding a point's majority changes the letter but not the digit (which is
+ * fixed by the point's position).
+ */
+export function pointLabel(
+  pointNumber: number,
+  majority: MajorityGender,
+): string {
+  const digit = (pointNumber - 1) % 2 === 0 ? '2' : '1';
+  return `${majority}${digit}`;
+}
+
 /** Slot counts for a point given its majority gender (mixed 4:3 / 3:4). */
 export function slotsForMajority(m: MajorityGender): { MMP: number; WMP: number } {
   return m === 'M' ? { MMP: 4, WMP: 3 } : { MMP: 3, WMP: 4 };

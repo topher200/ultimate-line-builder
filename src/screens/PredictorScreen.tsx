@@ -57,11 +57,11 @@ export function PredictorScreen() {
             onChange={setPossession}
           />
         </Field>
-        <Field label="First ratio">
+        <Field label="Start ratio">
           <Segmented
             options={[
-              { value: 'M', label: '4M:3W' },
-              { value: 'W', label: '3M:4W' },
+              { value: 'M', label: 'M2' },
+              { value: 'W', label: 'W2' },
             ]}
             value={majority}
             onChange={setMajority}
