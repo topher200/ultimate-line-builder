@@ -87,7 +87,7 @@ interface AppState {
   renameTournament: (id: Id, name: string) => void;
   setCurrentTournament: (id: Id) => void;
   recordPoint: (lineup: LineupEntry[], scoredBy: 'us' | 'them') => void;
-  undoLastPoint: () => void;
+  undoLast: () => void;
   startSecondHalf: () => void;
   setMode: (value: Mode) => void;
   setExpectedPoints: (value: number) => void;
@@ -240,11 +240,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  undoLastPoint: () => {
-    const last = [...get().events]
+  undoLast: () => {
+    const events = get().events;
+    const undone = new Set<string>();
+    for (const e of events) {
+      if (e.payload.kind === 'Undone') undone.add(e.payload.targetId);
+    }
+    // Step back through the last completed point or half start not already undone.
+    const last = [...events]
       .reverse()
-      .find((e) => e.payload.kind === 'PointCompleted');
-    if (last) appendEvent(get, set, { kind: 'PointUndone', targetId: last.id });
+      .find(
+        (e) =>
+          (e.payload.kind === 'PointCompleted' || e.payload.kind === 'HalfStarted') &&
+          !undone.has(e.id),
+      );
+    if (last) appendEvent(get, set, { kind: 'Undone', targetId: last.id });
   },
 
   startSecondHalf: () => appendEvent(get, set, { kind: 'HalfStarted' }),

@@ -107,11 +107,46 @@ describe('deriveState', () => {
 
   it('skips undone points', () => {
     const p = point(['a'], 'us', 'D', 'M', 'p1');
-    const undo: EventPayload = { kind: 'PointUndone', targetId: 'p1' };
+    const undo: EventPayload = { kind: 'Undone', targetId: 'p1' };
     const s = deriveState([start, p, ev(undo)]);
     expect(s.totalPoints).toBe(0);
     expect(s.played).toEqual({});
     expect(s.score).toEqual({ us: 0, them: 0 });
+  });
+
+  it('steps back through points as each is undone', () => {
+    const p1 = point(['a'], 'us', 'D', 'M', 'p1');
+    const p2 = point(['b'], 'them', 'O', 'W', 'p2');
+    const afterOneUndo = deriveState([
+      start,
+      p1,
+      p2,
+      ev({ kind: 'Undone', targetId: 'p2' }),
+    ]);
+    expect(afterOneUndo.totalPoints).toBe(1);
+    expect(afterOneUndo.score).toEqual({ us: 1, them: 0 });
+    const afterTwoUndos = deriveState([
+      start,
+      p1,
+      p2,
+      ev({ kind: 'Undone', targetId: 'p2' }),
+      ev({ kind: 'Undone', targetId: 'p1' }),
+    ]);
+    expect(afterTwoUndos.totalPoints).toBe(0);
+    expect(afterTwoUndos.score).toEqual({ us: 0, them: 0 });
+  });
+
+  it('reverts to the first half when the half start is undone', () => {
+    const half = ev({ kind: 'HalfStarted' }, 'h1');
+    const s = deriveState([
+      start,
+      point(['a'], 'us', 'D', 'M'),
+      half,
+      ev({ kind: 'Undone', targetId: 'h1' }),
+    ]);
+    expect(s.half).toBe(1);
+    expect(s.pointsPlayedThisHalf).toBe(1);
+    expect(s.playedThisHalf).toEqual({ a: 1 });
   });
 
   it('resets half counts and flips possession at the second half', () => {

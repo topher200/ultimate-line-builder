@@ -116,6 +116,7 @@ export function selectLine(
   players: Player[],
   context: PointContext,
   targets: Record<Id, number>,
+  opts: { jitter?: number } = {},
 ): SelectionResult {
   const slots = slotsForMajority(context.majority);
   const online = players.filter((p) => p.active && p.line === context.line);
@@ -131,7 +132,14 @@ export function selectLine(
   for (const gender of ['MMP', 'WMP'] as Gender[]) {
     const need = gender === 'MMP' ? slots.MMP : slots.WMP;
     const pool = online.filter((p) => p.gender === gender);
-    const ranked = rankCandidates(pool, state, targets, needingHalfPoint, halfPointsLeft);
+    const ranked = rankCandidates(
+      pool,
+      state,
+      targets,
+      needingHalfPoint,
+      halfPointsLeft,
+      opts.jitter ?? 0,
+    );
     const chosen = ranked.slice(0, need);
     if (chosen.length < need) short = true;
     for (const { player, reason } of chosen) {
@@ -149,6 +157,7 @@ function rankCandidates(
   targets: Record<Id, number>,
   needingHalfPoint: number,
   halfPointsLeft: number,
+  jitter: number,
 ): { player: Player; reason: string; score: number }[] {
   const scored = pool.map((p) => {
     const played = state.played[p.id] ?? 0;
@@ -157,7 +166,9 @@ function rankCandidates(
     const urgency = needsHalf
       ? (URGENCY_WEIGHT * needingHalfPoint) / Math.max(1, halfPointsLeft)
       : 0;
-    const score = urgency + deficit;
+    // Jitter only perturbs the deficit tier, never the much larger urgency, so
+    // a reshuffle varies who fills slack slots without violating half-point owed.
+    const score = urgency + deficit + jitter * Math.random();
     const reason = needsHalf ? 'needs a half point' : 'owed a point';
     return { player: p, reason, score };
   });

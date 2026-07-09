@@ -22,7 +22,7 @@ const DEFAULTS = {
 export function deriveState(events: EventEnvelope[]): GameState {
   const undone = new Set<string>();
   for (const e of events) {
-    if (e.payload.kind === 'PointUndone') undone.add(e.payload.targetId);
+    if (e.payload.kind === 'Undone') undone.add(e.payload.targetId);
   }
 
   let expectedPoints = DEFAULTS.expectedPoints;
@@ -66,6 +66,7 @@ export function deriveState(events: EventEnvelope[]): GameState {
         pendingMajority = p.value;
         break;
       case 'HalfStarted':
+        if (undone.has(e.id)) break;
         half = 2;
         pointsPlayedThisHalf = 0;
         lastScoredBy = null;
@@ -86,7 +87,7 @@ export function deriveState(events: EventEnvelope[]): GameState {
         pendingMajority = null;
         break;
       }
-      case 'PointUndone':
+      case 'Undone':
         break;
     }
   }

@@ -23,7 +23,7 @@ export interface PlayedPoint {
 export function playedPoints(events: EventEnvelope[]): PlayedPoint[] {
   const undone = new Set<string>();
   for (const e of events) {
-    if (e.payload.kind === 'PointUndone') undone.add(e.payload.targetId);
+    if (e.payload.kind === 'Undone') undone.add(e.payload.targetId);
   }
 
   const out: PlayedPoint[] = [];

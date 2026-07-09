@@ -45,12 +45,11 @@ function ActiveGame() {
     return { game: g, targets: t };
   }, [events, players]);
   const recordPoint = useAppStore((s) => s.recordPoint);
-  const undoLastPoint = useAppStore((s) => s.undoLastPoint);
+  const undoLast = useAppStore((s) => s.undoLast);
   const startSecondHalf = useAppStore((s) => s.startSecondHalf);
   const overridePossession = useAppStore((s) => s.overridePossession);
   const overrideMajority = useAppStore((s) => s.overrideMajority);
   const updateGameMeta = useAppStore((s) => s.updateGameMeta);
-  const navigate = useNavigate();
 
   // Which line takes the field. Defaults to the line matching possession; the
   // coach can call the other line for a point (it resets each new point).
@@ -58,16 +57,21 @@ function ActiveGame() {
   const [fieldedLine, setFieldedLine] = useState<Line>(defaultLine);
   useEffect(() => setFieldedLine(defaultLine), [game.totalPoints, defaultLine]);
 
+  // Bumping this re-picks the line with jitter, so a reshuffle varies the slack
+  // slots. It resets to a clean deterministic pick each new point.
+  const [reshuffle, setReshuffle] = useState(0);
+  useEffect(() => setReshuffle(0), [game.totalPoints]);
+
   const context = {
     possession: game.nextPossession,
     majority: game.nextMajority,
     line: fieldedLine,
   };
   const suggestion = useMemo(
-    () => selectLine(game, players, context, targets),
-    // Regenerate when the point context changes.
+    () => selectLine(game, players, context, targets, { jitter: reshuffle > 0 ? 2 : 0 }),
+    // Regenerate when the point context changes or a reshuffle is requested.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [game.totalPoints, game.nextPossession, game.nextMajority, game.mode, fieldedLine],
+    [game.totalPoints, game.nextPossession, game.nextMajority, game.mode, fieldedLine, reshuffle],
   );
 
   const [lineup, setLineup] = useState<LineupEntry[]>(suggestion.lineup);
@@ -167,7 +171,7 @@ function ActiveGame() {
           </span>
           <button
             className="rounded bg-slate-600 px-3 py-1 text-sm"
-            onClick={() => setLineup(suggestion.lineup)}
+            onClick={() => setReshuffle((n) => n + 1)}
           >
             Reshuffle
           </button>
@@ -231,14 +235,11 @@ function ActiveGame() {
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
-        <button className="rounded bg-slate-600 px-4 py-2" onClick={undoLastPoint}>
-          Undo point
+        <button className="rounded bg-slate-600 px-4 py-2" onClick={undoLast}>
+          Undo
         </button>
         <button className="rounded bg-slate-600 px-4 py-2" onClick={startSecondHalf}>
           Start 2nd half
-        </button>
-        <button className="rounded bg-slate-600 px-4 py-2" onClick={() => navigate('/games')}>
-          Games
         </button>
       </div>
 

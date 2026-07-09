@@ -17,7 +17,7 @@ function point(id: string, scoredBy: 'us' | 'them', players: string[]): EventEnv
 }
 
 function undo(targetId: string): EventEnvelope {
-  return envelope(`u-${targetId}`, { kind: 'PointUndone', targetId });
+  return envelope(`u-${targetId}`, { kind: 'Undone', targetId });
 }
 
 describe('playedPoints', () => {

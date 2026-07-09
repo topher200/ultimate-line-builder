@@ -51,7 +51,7 @@ export type EventPayload =
   | { kind: 'PossessionOverridden'; value: Possession }
   | { kind: 'MajorityOverridden'; value: MajorityGender }
   | { kind: 'HalfStarted' }
-  | { kind: 'PointUndone'; targetId: Id };
+  | { kind: 'Undone'; targetId: Id };
 
 export interface EventEnvelope {
   id: Id;
