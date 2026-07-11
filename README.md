@@ -220,21 +220,3 @@ src/
 docs/DATA_MODEL.md   deep spec: events, fold, sync merge, rotation engine
 ```
 
-## 7. Status
-
-Rev-1 core is working: enter a roster, start a game, and the Game screen calls
-lines (correct 4:3 / 3:4 ratio, O/D-aware, deficit-based rotation, once-per-half
-urgency), tracks score/possession/gender automatically, records points, supports
-undo + injury subs + line edits, shows per-player game/day/tournament counts plus
-goal/predicted, and persists to localStorage. Games group into days (by date) and
-tournaments (start a new one from the Game screen). The Predictor screen
-simulates a full game from the roster + settings, with O-only / D-only views.
-Still to do: Supabase sync + longest-chain merge and handler/cutter roles.
-
-## 8. Roadmap
-
-- **Rev 1 (MVP, done):** Roster + Game + Predictor screens, rotation engine,
-  gender/possession tracking, Doctor, game/day/tournament counts, localStorage,
-  PWA.
-- **Rev 1.1:** Supabase sync with longest-chain merge.
-- **Rev 2:** handler/cutter roles; richer conflict UI; real app icons.
