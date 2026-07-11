@@ -124,6 +124,25 @@ export class SupabaseRepository implements Repository {
     if (error) throw error;
   }
 
+  async deleteTournament(id: Id): Promise<void> {
+    const { error } = await getSupabase().from('tournaments').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  async deleteGames(gameIds: Id[]): Promise<void> {
+    if (gameIds.length === 0) return;
+    const { error: eventsError } = await getSupabase()
+      .from('events')
+      .delete()
+      .in('game_id', gameIds);
+    if (eventsError) throw eventsError;
+    const { error: gamesError } = await getSupabase()
+      .from('games')
+      .delete()
+      .in('game_id', gameIds);
+    if (gamesError) throw gamesError;
+  }
+
   async loadLog(gameId: Id): Promise<EventEnvelope[]> {
     const { data, error } = await getSupabase()
       .from('events')

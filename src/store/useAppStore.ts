@@ -85,6 +85,7 @@ interface AppState {
   updateGameMeta: (gameId: Id, patch: Partial<Pick<GameMeta, 'name' | 'ourTeam' | 'theirTeam'>>) => void;
   createTournament: (name: string) => Id;
   renameTournament: (id: Id, name: string) => void;
+  deleteTournament: (id: Id) => void;
   setCurrentTournament: (id: Id) => void;
   recordPoint: (lineup: LineupEntry[], scoredBy: 'us' | 'them') => void;
   undoLast: () => void;
@@ -222,6 +223,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ tournaments });
     void get().repo.saveTournaments(tournaments);
     pushRemote(() => remote!.saveTournaments(tournaments));
+  },
+
+  deleteTournament: (id) => {
+    const { tournaments, games, logs, currentGameId, currentTournamentId, repo } =
+      get();
+    const removedIds = games
+      .filter((g) => g.tournamentId === id)
+      .map((g) => g.gameId);
+    const removed = new Set(removedIds);
+    const remainingGames = games.filter((g) => !removed.has(g.gameId));
+    const remainingTournaments = tournaments.filter((t) => t.id !== id);
+    const nextLogs = { ...logs };
+    for (const gid of removedIds) delete nextLogs[gid];
+    const nextGameId =
+      currentGameId && removed.has(currentGameId) ? null : currentGameId;
+
+    set({
+      tournaments: remainingTournaments,
+      games: remainingGames,
+      logs: nextLogs,
+      currentGameId: nextGameId,
+      events: nextGameId ? (nextLogs[nextGameId] ?? []) : [],
+    });
+
+    void repo.deleteGames(removedIds);
+    void repo.deleteTournament(id);
+    pushRemote(() => remote!.deleteGames(removedIds));
+    pushRemote(() => remote!.deleteTournament(id));
+
+    // Keep a valid current tournament: fall back to the newest survivor, or a
+    // fresh one when the last tournament is deleted.
+    if (currentTournamentId === id) {
+      const next = [...remainingTournaments].sort(
+        (a, b) => b.createdAt - a.createdAt,
+      )[0];
+      if (next) get().setCurrentTournament(next.id);
+      else get().createTournament('');
+    }
   },
 
   setCurrentTournament: (id) => {

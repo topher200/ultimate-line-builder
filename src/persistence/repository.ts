@@ -13,6 +13,8 @@ export interface Repository {
   saveTournaments(tournaments: Tournament[]): Promise<void>;
   listGames(): Promise<GameMeta[]>;
   saveGames(games: GameMeta[]): Promise<void>;
+  deleteTournament(id: Id): Promise<void>;
+  deleteGames(gameIds: Id[]): Promise<void>;
   loadLog(gameId: Id): Promise<EventEnvelope[]>;
   saveLog(gameId: Id, events: EventEnvelope[]): Promise<void>;
   appendEvent(event: EventEnvelope): Promise<void>;
@@ -49,6 +51,18 @@ export class LocalRepository implements Repository {
 
   async saveGames(games: GameMeta[]): Promise<void> {
     writeJson(KEY.games, games);
+  }
+
+  async deleteTournament(id: Id): Promise<void> {
+    const tournaments = await this.listTournaments();
+    await this.saveTournaments(tournaments.filter((t) => t.id !== id));
+  }
+
+  async deleteGames(gameIds: Id[]): Promise<void> {
+    const removed = new Set(gameIds);
+    const games = await this.listGames();
+    await this.saveGames(games.filter((g) => !removed.has(g.gameId)));
+    for (const id of gameIds) localStorage.removeItem(KEY.log(id));
   }
 
   async loadLog(gameId: Id): Promise<EventEnvelope[]> {

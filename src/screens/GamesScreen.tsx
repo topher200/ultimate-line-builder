@@ -27,6 +27,7 @@ export function GamesScreen() {
   const loadGame = useAppStore((s) => s.loadGame);
   const createTournament = useAppStore((s) => s.createTournament);
   const renameTournament = useAppStore((s) => s.renameTournament);
+  const deleteTournament = useAppStore((s) => s.deleteTournament);
   const setCurrentTournament = useAppStore((s) => s.setCurrentTournament);
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
@@ -89,6 +90,19 @@ export function GamesScreen() {
           isCurrent={tournament.id === currentTournamentId}
           onRename={(name) => renameTournament(tournament.id, name)}
           onMakeCurrent={() => setCurrentTournament(tournament.id)}
+          onDelete={() => {
+            const suffix =
+              tGames.length > 0
+                ? ` and its ${tGames.length} game${tGames.length === 1 ? '' : 's'}`
+                : '';
+            if (
+              window.confirm(
+                `Delete "${tournament.name}"${suffix}? This cannot be undone.`,
+              )
+            ) {
+              deleteTournament(tournament.id);
+            }
+          }}
           onOpen={open}
         />
       ))}
@@ -110,6 +124,7 @@ function TournamentSection({
   isCurrent,
   onRename,
   onMakeCurrent,
+  onDelete,
   onOpen,
 }: {
   tournament: Tournament;
@@ -119,6 +134,7 @@ function TournamentSection({
   isCurrent: boolean;
   onRename: (name: string) => void;
   onMakeCurrent: () => void;
+  onDelete: () => void;
   onOpen: (gameId: string) => void;
 }) {
   return (
@@ -141,6 +157,12 @@ function TournamentSection({
             Make current
           </button>
         )}
+        <button
+          className="ml-auto text-xs text-slate-500 underline hover:text-red-400"
+          onClick={onDelete}
+        >
+          Delete
+        </button>
       </div>
       {games.length === 0 && (
         <p className="rounded-lg bg-slate-800/60 p-3 text-sm text-slate-500">

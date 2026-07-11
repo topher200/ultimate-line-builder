@@ -123,6 +123,14 @@ export function PlayingTimeScreen() {
               : 'No players match this view.'}
           </p>
         )}
+        <p className="mt-2 border-t border-slate-700 pt-2 text-xs text-slate-500">
+          <span className="font-semibold text-slate-400">Game</span>,{' '}
+          <span className="font-semibold text-slate-400">Day</span>, and{' '}
+          <span className="font-semibold text-slate-400">Tourn</span> are points
+          played so far this game, today, and this tournament.{' '}
+          <span className="font-semibold text-slate-400">Pred</span> is the
+          projected points this player finishes the game with, over their target.
+        </p>
       </div>
     </div>
   );
