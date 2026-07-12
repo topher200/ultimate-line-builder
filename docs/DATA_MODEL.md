@@ -112,8 +112,6 @@ type EventPayload =
   | { kind: 'StartConfigChanged';
       startingPossession?: Possession;   // correct what the game started on
       startingMajority?: MajorityGender; }
-  | { kind: 'PossessionOverridden'; value: Possession }   // next point only
-  | { kind: 'MajorityOverridden'; value: MajorityGender }  // next point only
   | { kind: 'HalfStarted' }            // marks the second-half boundary
   | { kind: 'Undone'; targetId: Id };  // compensating event (point or half start)
 
@@ -140,8 +138,8 @@ interface GameState {
   events: EventEnvelope[];
   config: { expectedPoints: number; mode: number };
   // current point context
-  nextPossession: Possession;          // from last result + halftime + overrides
-  nextMajority: MajorityGender;         // from ABBA pattern + overrides
+  nextPossession: Possession;          // from last result + halftime
+  nextMajority: MajorityGender;         // from ABBA pattern + starting ratio
   half: 1 | 2;
   score: { us: number; them: number };
   pointIndexInHalf: number;            // 0-based, for the ABBA pattern
@@ -154,8 +152,7 @@ interface GameState {
 
 ```
 pointForNext =
-  if a PossessionOverridden is pending -> that value
-  else if this is the first point of the game -> GameStarted.startingPossession
+  if this is the first point of the game -> GameStarted.startingPossession
   else if this is the first point of the second half ->
         opposite of GameStarted.startingPossession
   else if last point scoredBy 'us' -> 'D'      // we pull
@@ -174,8 +171,9 @@ majority(p, start) = (patternOffset(p) in {0,3}) ? start : opposite(start)
 ```
 
 Because the second half restarts `p` at 1, the second half opens on the same
-majority as the game's first point (matches the README's half-time rule). A
-pending `MajorityOverridden` wins over the computed value for that one point.
+majority as the game's first point (matches the README's half-time rule). The
+starting majority comes from `GameStarted` and can be corrected by a later
+`StartConfigChanged`.
 
 ## 5. Roster document
 
@@ -368,7 +366,7 @@ The domain core is where correctness lives, so it carries the test weight:
 
 - ABBA majority pattern across a full game including the half-time boundary and
   overrides.
-- Possession derivation incl. first point, halftime flip, and force toggles.
+- Possession derivation incl. first point and halftime flip.
 - Target math for competitive / equal / non-competitive and blends.
 - Selection honoring gender counts, line preference, deficits, and the
   once-per-half urgency.

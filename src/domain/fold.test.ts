@@ -172,15 +172,4 @@ describe('deriveState', () => {
     expect(s.nextPossession).toBe('O'); // started game on D -> half opens O
     expect(s.nextMajority).toBe('W'); // ratio pattern continues across half: point 2 = W
   });
-
-  it('honors a pending majority override for the next point only', () => {
-    const s = deriveState([start, ev({ kind: 'MajorityOverridden', value: 'W' })]);
-    expect(s.nextMajority).toBe('W');
-    const s2 = deriveState([
-      start,
-      ev({ kind: 'MajorityOverridden', value: 'W' }),
-      point(['a'], 'us', 'D', 'W'),
-    ]);
-    expect(s2.nextMajority).toBe('W'); // point 2 in half: pattern B = opposite of M
-  });
 });

@@ -198,7 +198,7 @@ as a fallback.
 
 ```
 src/
-  domain/        pure TS, no React, fully unit-tested (58 tests):
+  domain/        pure TS, no React, fully unit-tested (57 tests):
                    types, rules (ABBA/possession), fold (deriveState),
                    engine (targets/selectLine/predictGame), aggregate, doctor
   persistence/   Repository interface + LocalRepository

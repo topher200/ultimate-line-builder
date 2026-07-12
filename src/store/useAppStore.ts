@@ -97,8 +97,6 @@ interface AppState {
   setExpectedPoints: (value: number) => void;
   setStartingPossession: (value: Possession) => void;
   setStartingMajority: (value: MajorityGender) => void;
-  overridePossession: (value: Possession) => void;
-  overrideMajority: (value: MajorityGender) => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -344,10 +342,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     appendEvent(get, set, { kind: 'StartConfigChanged', startingPossession: value }),
   setStartingMajority: (value) =>
     appendEvent(get, set, { kind: 'StartConfigChanged', startingMajority: value }),
-  overridePossession: (value) =>
-    appendEvent(get, set, { kind: 'PossessionOverridden', value }),
-  overrideMajority: (value) =>
-    appendEvent(get, set, { kind: 'MajorityOverridden', value }),
 }));
 
 /** Backfill team names on games persisted before those fields existed. */

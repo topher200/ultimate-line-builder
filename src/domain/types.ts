@@ -53,8 +53,6 @@ export type EventPayload =
       startingMajority?: MajorityGender;
     }
   | { kind: 'ModeChanged'; value: Mode }
-  | { kind: 'PossessionOverridden'; value: Possession }
-  | { kind: 'MajorityOverridden'; value: MajorityGender }
   | { kind: 'HalfStarted' }
   | { kind: 'Undone'; targetId: Id };
 
