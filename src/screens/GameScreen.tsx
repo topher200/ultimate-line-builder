@@ -1,105 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
 import { computeTargets, selectLine } from '../domain/engine.ts';
 import { slotsForMajority } from '../domain/rules.ts';
-import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
-import { ModeSlider } from '../components/ModeSlider.tsx';
+import { Segmented } from '../components/Segmented.tsx';
 import { GameSettings } from '../components/GameSettings.tsx';
 import { GameTimeline } from './GameTimeline.tsx';
-import type {
-  Line,
-  LineupEntry,
-  MajorityGender,
-  Player,
-  Possession,
-} from '../domain/types.ts';
+import type { Line, LineupEntry, Player } from '../domain/types.ts';
 
 export function GameScreen() {
   const currentGameId = useAppStore((s) => s.currentGameId);
   const events = useAppStore((s) => s.events);
-  const [starting, setStarting] = useState(false);
+  const navigate = useNavigate();
   const hasGame = currentGameId != null && events.length > 0;
 
-  if (!hasGame || starting) return <NewGamePanel onStarted={() => setStarting(false)} />;
-  return <ActiveGame onNewGame={() => setStarting(true)} />;
+  if (!hasGame) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 p-10 text-center">
+        <h1 className="text-2xl font-bold">No game loaded</h1>
+        <p className="text-slate-400">Pick a game or start a new one.</p>
+        <button
+          className="rounded bg-emerald-600 px-6 py-3 font-semibold"
+          onClick={() => navigate('/games')}
+        >
+          Go to Games
+        </button>
+      </div>
+    );
+  }
+  return <ActiveGame />;
 }
 
-function NewGamePanel({ onStarted }: { onStarted: () => void }) {
-  const newGame = useAppStore((s) => s.newGame);
-  const startNewTournament = useAppStore((s) => s.startNewTournament);
-  const [possession, setPossession] = useState<Possession>('D');
-  const [majority, setMajority] = useState<MajorityGender>('M');
-  const [expectedPoints, setExpectedPoints] = useState(DEFAULT_EXPECTED_POINTS);
-  const [mode, setMode] = useState(0);
-
-  const start = () => {
-    newGame({
-      name: new Date().toLocaleString(),
-      startingPossession: possession,
-      startingMajority: majority,
-      expectedPoints,
-      mode,
-    });
-    onStarted();
-  };
-
-  return (
-    <div className="mx-auto flex max-w-md flex-col gap-4 p-6">
-      <h1 className="text-2xl font-bold">Start a game</h1>
-      <Field label="We start on">
-        <Segmented
-          options={[
-            { value: 'O', label: 'Offense' },
-            { value: 'D', label: 'Defense' },
-          ]}
-          value={possession}
-          onChange={setPossession}
-        />
-      </Field>
-      <Field label="First point ratio">
-        <Segmented
-          options={[
-            { value: 'M', label: '4 MMP : 3 WMP' },
-            { value: 'W', label: '3 MMP : 4 WMP' },
-          ]}
-          value={majority}
-          onChange={setMajority}
-        />
-      </Field>
-      <Field label={`Expected points: ${expectedPoints}`}>
-        <input
-          type="number"
-          min={1}
-          max={40}
-          value={expectedPoints}
-          className="w-24 rounded bg-slate-700 px-3 py-2 text-lg"
-          onChange={(e) => setExpectedPoints(Number(e.target.value))}
-        />
-      </Field>
-      <ModeSlider value={mode} onChange={setMode} />
-      <button
-        className="rounded bg-emerald-600 py-3 text-lg font-semibold"
-        onClick={start}
-      >
-        Start game
-      </button>
-      <button
-        className="rounded bg-slate-700 py-2 text-sm text-slate-300"
-        onClick={() => {
-          startNewTournament();
-          start();
-        }}
-      >
-        Start as a new tournament
-      </button>
-    </div>
-  );
-}
-
-function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
+function ActiveGame() {
   const players = useAppStore((s) => s.players);
   const events = useAppStore((s) => s.events);
+  const games = useAppStore((s) => s.games);
+  const currentGameId = useAppStore((s) => s.currentGameId);
+  const meta = games.find((g) => g.gameId === currentGameId);
   const { game, targets } = useMemo(() => {
     const g = deriveState(events);
     const t = computeTargets(players, g.expectedPoints, g.mode, 0.5, g.modeBaseline);
@@ -110,6 +48,8 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
   const startSecondHalf = useAppStore((s) => s.startSecondHalf);
   const overridePossession = useAppStore((s) => s.overridePossession);
   const overrideMajority = useAppStore((s) => s.overrideMajority);
+  const updateGameMeta = useAppStore((s) => s.updateGameMeta);
+  const navigate = useNavigate();
 
   // Which line takes the field. Defaults to the line matching possession; the
   // coach can call the other line for a point (it resets each new point).
@@ -142,13 +82,26 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
   };
 
   const score = (scoredBy: 'us' | 'them') => recordPoint(lineup, scoredBy);
+  const rename = (patch: { ourTeam?: string; theirTeam?: string }) => {
+    if (currentGameId) updateGameMeta(currentGameId, patch);
+  };
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-3 p-3">
       {/* Scoreboard */}
       <div className="flex items-center justify-between rounded-lg bg-slate-800 p-3">
-        <div className="text-3xl font-bold tabular-nums">
-          Us {game.score.us} <span className="text-slate-500">-</span> {game.score.them} Them
+        <div className="flex items-center gap-2 text-3xl font-bold tabular-nums">
+          <EditableName
+            value={meta?.ourTeam ?? 'Us'}
+            onChange={(v) => rename({ ourTeam: v })}
+          />
+          <span>{game.score.us}</span>
+          <span className="text-slate-500">-</span>
+          <span>{game.score.them}</span>
+          <EditableName
+            value={meta?.theirTeam ?? 'Them'}
+            onChange={(v) => rename({ theirTeam: v })}
+          />
         </div>
         <div className="text-right text-sm text-slate-400">
           <div>Half {game.half}</div>
@@ -232,13 +185,13 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
           className="rounded-lg bg-emerald-600 py-5 text-xl font-bold"
           onClick={() => score('us')}
         >
-          +1 Us
+          +1 {meta?.ourTeam ?? 'Us'}
         </button>
         <button
           className="rounded-lg bg-rose-700 py-5 text-xl font-bold"
           onClick={() => score('them')}
         >
-          +1 Them
+          +1 {meta?.theirTeam ?? 'Them'}
         </button>
       </div>
 
@@ -272,8 +225,8 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
         <button className="rounded bg-slate-600 px-4 py-2" onClick={startSecondHalf}>
           Start 2nd half
         </button>
-        <button className="rounded bg-slate-600 px-4 py-2" onClick={onNewGame}>
-          New game
+        <button className="rounded bg-slate-600 px-4 py-2" onClick={() => navigate('/games')}>
+          Games
         </button>
       </div>
 
@@ -281,6 +234,45 @@ function ActiveGame({ onNewGame }: { onNewGame: () => void }) {
 
       <GameTimeline events={events} players={players} game={game} targets={targets} />
     </div>
+  );
+}
+
+function EditableName({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        className="w-28 rounded bg-slate-700 px-2 py-1 text-lg"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          if (draft.trim()) onChange(draft.trim());
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
+      />
+    );
+  }
+  return (
+    <button
+      className="text-lg font-semibold text-slate-300 underline decoration-dotted underline-offset-4"
+      onClick={() => {
+        setDraft(value);
+        setEditing(true);
+      }}
+    >
+      {value}
+    </button>
   );
 }
 
@@ -306,40 +298,5 @@ function PlayerChip({
       </span>
       <span className="text-xs opacity-70">{player.gender}</span>
     </button>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-sm text-slate-400">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex overflow-hidden rounded">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          className={`px-4 py-2 font-semibold ${
-            o.value === value ? 'bg-emerald-600' : 'bg-slate-700 text-slate-300'
-          }`}
-          onClick={() => onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }

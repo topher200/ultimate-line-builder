@@ -68,6 +68,10 @@ export interface GameMeta {
   name: string;
   createdAt: number;
   tournamentId: Id;
+  /** Our team's display name; defaults to 'Rampage'. */
+  ourTeam: string;
+  /** Opponent's display name; defaults to 'Opponent'. */
+  theirTeam: string;
 }
 
 /**
