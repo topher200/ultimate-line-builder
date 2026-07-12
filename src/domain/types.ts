@@ -67,6 +67,10 @@ export interface Tournament {
   id: Id;
   name: string;
   createdAt: number;
+  /** Last-write-wins clock; newer wins when merging edits across devices. */
+  updatedAt?: number;
+  /** Soft-delete tombstone; set means deleted. Syncs so deletes propagate. */
+  deletedAt?: number;
 }
 
 export interface GameMeta {
@@ -78,6 +82,10 @@ export interface GameMeta {
   ourTeam: string;
   /** Opponent's display name; defaults to 'Opponent'. */
   theirTeam: string;
+  /** Last-write-wins clock; newer wins when merging edits across devices. */
+  updatedAt?: number;
+  /** Soft-delete tombstone; set means deleted. Syncs so deletes propagate. */
+  deletedAt?: number;
 }
 
 /**

@@ -33,12 +33,13 @@ export function GamesScreen() {
   const [creating, setCreating] = useState(false);
 
   const grouped = useMemo(() => {
-    return [...tournaments]
+    return tournaments
+      .filter((t) => !t.deletedAt)
       .sort((a, b) => b.createdAt - a.createdAt)
       .map((t) => ({
         tournament: t,
         games: games
-          .filter((g) => g.tournamentId === t.id)
+          .filter((g) => g.tournamentId === t.id && !g.deletedAt)
           .sort((a, b) => b.createdAt - a.createdAt),
       }));
   }, [tournaments, games]);

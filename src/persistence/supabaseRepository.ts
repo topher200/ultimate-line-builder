@@ -71,13 +71,15 @@ export class SupabaseRepository implements Repository {
   async listTournaments(): Promise<Tournament[]> {
     const { data, error } = await getSupabase()
       .from('tournaments')
-      .select('id, name, created_at')
+      .select('id, name, created_at, updated_at, deleted_at')
       .order('created_at', { ascending: true });
     if (error) throw error;
     return (data ?? []).map((t) => ({
       id: t.id,
       name: t.name,
       createdAt: t.created_at,
+      ...(t.updated_at ? { updatedAt: t.updated_at } : {}),
+      ...(t.deleted_at ? { deletedAt: t.deleted_at } : {}),
     }));
   }
 
@@ -88,6 +90,8 @@ export class SupabaseRepository implements Repository {
         id: t.id,
         name: t.name,
         created_at: t.createdAt,
+        updated_at: t.updatedAt ?? null,
+        deleted_at: t.deletedAt ?? null,
       })),
     );
     if (error) throw error;
@@ -96,7 +100,9 @@ export class SupabaseRepository implements Repository {
   async listGames(): Promise<GameMeta[]> {
     const { data, error } = await getSupabase()
       .from('games')
-      .select('game_id, name, created_at, tournament_id, our_team, their_team')
+      .select(
+        'game_id, name, created_at, tournament_id, our_team, their_team, updated_at, deleted_at',
+      )
       .order('created_at', { ascending: true });
     if (error) throw error;
     return (data ?? []).map((g) => ({
@@ -106,6 +112,8 @@ export class SupabaseRepository implements Repository {
       tournamentId: g.tournament_id,
       ourTeam: g.our_team ?? DEFAULT_OUR_TEAM,
       theirTeam: g.their_team ?? DEFAULT_THEIR_TEAM,
+      ...(g.updated_at ? { updatedAt: g.updated_at } : {}),
+      ...(g.deleted_at ? { deletedAt: g.deleted_at } : {}),
     }));
   }
 
@@ -119,28 +127,11 @@ export class SupabaseRepository implements Repository {
         tournament_id: g.tournamentId,
         our_team: g.ourTeam,
         their_team: g.theirTeam,
+        updated_at: g.updatedAt ?? null,
+        deleted_at: g.deletedAt ?? null,
       })),
     );
     if (error) throw error;
-  }
-
-  async deleteTournament(id: Id): Promise<void> {
-    const { error } = await getSupabase().from('tournaments').delete().eq('id', id);
-    if (error) throw error;
-  }
-
-  async deleteGames(gameIds: Id[]): Promise<void> {
-    if (gameIds.length === 0) return;
-    const { error: eventsError } = await getSupabase()
-      .from('events')
-      .delete()
-      .in('game_id', gameIds);
-    if (eventsError) throw eventsError;
-    const { error: gamesError } = await getSupabase()
-      .from('games')
-      .delete()
-      .in('game_id', gameIds);
-    if (gamesError) throw gamesError;
   }
 
   async loadLog(gameId: Id): Promise<EventEnvelope[]> {

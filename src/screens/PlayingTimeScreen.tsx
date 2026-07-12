@@ -34,10 +34,10 @@ export function PlayingTimeScreen() {
     const current = games.find((m) => m.gameId === currentGameId);
     if (!current) return { dayPlayed: {}, tournamentPlayed: {} };
     const dayLogs = games
-      .filter((m) => sameDay(m.createdAt, current.createdAt))
+      .filter((m) => !m.deletedAt && sameDay(m.createdAt, current.createdAt))
       .map((m) => logs[m.gameId] ?? []);
     const tournLogs = games
-      .filter((m) => m.tournamentId === current.tournamentId)
+      .filter((m) => !m.deletedAt && m.tournamentId === current.tournamentId)
       .map((m) => logs[m.gameId] ?? []);
     return {
       dayPlayed: sumPlayedAcross(dayLogs),

@@ -43,7 +43,32 @@ interface Roster {
   updatedAt: number;                    // for last-write-wins merge
   updatedBy: DeviceId;
 }
+
+interface Tournament {
+  id: Id;
+  name: string;
+  createdAt: number;
+  updatedAt?: number;                   // last-write-wins clock
+  deletedAt?: number;                   // soft-delete tombstone; set = deleted
+}
+
+interface GameMeta {
+  gameId: Id;
+  name: string;
+  createdAt: number;
+  tournamentId: Id;                     // the tournament this game belongs to
+  ourTeam: string;
+  theirTeam: string;
+  updatedAt?: number;                   // last-write-wins clock
+  deletedAt?: number;                   // soft-delete tombstone; set = deleted
+}
 ```
+
+Games are grouped under **tournaments**. Both are plain rows (not event logs):
+they sync by last-write-wins on `updatedAt`, and delete via a `deletedAt`
+tombstone rather than row removal, so a deletion propagates through the
+add-only merge instead of being resurrected (see section 7). Deleting a
+tournament tombstones its games too.
 
 ### Competitiveness mode
 
@@ -87,7 +112,7 @@ type EventPayload =
   | { kind: 'PossessionOverridden'; value: Possession }   // next point only
   | { kind: 'MajorityOverridden'; value: MajorityGender }  // next point only
   | { kind: 'HalfStarted' }            // marks the second-half boundary
-  | { kind: 'PointUndone'; targetId: Id };  // compensating event
+  | { kind: 'Undone'; targetId: Id };  // compensating event (point or half start)
 
 interface LineupEntry {
   playerId: Id;
@@ -98,9 +123,9 @@ interface LineupEntry {
 
 Notes:
 
-- **Undo** appends `PointUndone` referencing the point's event id rather than
-  mutating history. The fold skips undone points. (Simplest robust approach for
-  sync; the log stays append-only.)
+- **Undo** appends `Undone` referencing the target event's id rather than
+  mutating history. The fold skips the undone point or half start. (Simplest
+  robust approach for sync; the log stays append-only.)
 - Roster edits are **not** events -- they live in the roster document (section 5).
 - Ephemeral UI state (the proposed-but-unconfirmed line, slider being dragged)
   is never an event. Only a *confirmed* point becomes `PointCompleted`.
@@ -152,10 +177,13 @@ pending `MajorityOverridden` wins over the computed value for that one point.
 ## 5. Roster document
 
 The roster is mutable current-state, stored separately from any game log.
-Merge policy: **last-write-wins per player**, keyed on a per-player `updatedAt`.
-(A whole-document `updatedAt` is kept too, for cheap "which is newer" checks.)
-Roster edits are rare and almost never concurrent, so LWW is sufficient and far
-simpler than merging into the event log.
+Merge policy: **whole-document last-write-wins**, keyed on the document
+`updatedAt`. On reconcile each device adopts whichever roster doc is newer, so
+player adds, edits, and deletions all propagate as a unit (a deleted player is
+simply absent from the newer doc). Roster edits are rare and almost never
+concurrent, so document-level LWW is sufficient and far simpler than merging
+into the event log; the tradeoff is that truly concurrent edits on two devices
+resolve to one device's whole doc rather than being field-merged.
 
 ## 6. Persistence
 
@@ -163,25 +191,33 @@ simpler than merging into the event log.
 interface Repository {
   loadRoster(): Promise<Roster | null>;
   saveRoster(r: Roster): Promise<void>;
+  listTournaments(): Promise<Tournament[]>;
+  saveTournaments(ts: Tournament[]): Promise<void>;
   listGames(): Promise<GameMeta[]>;
+  saveGames(games: GameMeta[]): Promise<void>;
   loadLog(gameId: Id): Promise<EventEnvelope[]>;
+  saveLog(gameId: Id, events: EventEnvelope[]): Promise<void>;
   appendEvent(e: EventEnvelope): Promise<void>;
-  // sync (no-op in the local-only implementation)
-  pushPending?(): Promise<void>;
-  pull?(): Promise<void>;
 }
 ```
 
-- **Rev 1: `LocalRepository`** -- serializes the roster and each game log to
-  `localStorage` as JSON. A weekend is a few hundred events, so size is a
-  non-issue. Keep everything behind this interface so the storage engine can be
-  swapped without touching the store or UI.
-- **Later: `SupabaseRepository`** -- Postgres tables:
-  - `events(game_id, seq, id, parent_id, device_id, ts, payload jsonb)`,
-    primary key `(game_id, device_id, seq)`.
+Tournament and game rows carry `updatedAt`/`deletedAt` for merge; deletes are
+tombstones (a save with `deletedAt` set), never row removal, so `saveGames` /
+`saveTournaments` also serve as the delete path.
+
+- **Rev 1: `LocalRepository`** -- serializes the roster, tournament list, game
+  list, and each game log to `localStorage` as JSON. A weekend is a few hundred
+  events, so size is a non-issue. Keep everything behind this interface so the
+  storage engine can be swapped without touching the store or UI.
+- **`SupabaseRepository`** -- a durable cloud mirror behind the same interface
+  (see `db/schema.sql`). Postgres tables:
+  - `events(id pk, game_id, seq, parent_id, device_id, ts, payload jsonb)`.
   - `rosters(id, doc jsonb, updated_at)`.
-  Auth can be a single shared team login (magic link) for rev 1.1; no per-user
-  accounts needed.
+  - `tournaments(id pk, name, created_at, updated_at, deleted_at)`.
+  - `games(game_id pk, name, created_at, tournament_id, our_team, their_team,
+    updated_at, deleted_at)`.
+  RLS grants the anon (publishable) key full access, gated to a single private
+  team. Local stays the source of truth; the mirror is best-effort.
 
 ## 7. Sync & conflict reconciliation ("longest chain wins")
 
@@ -207,6 +243,23 @@ recorded more points is the real one" is the intuitive resolution. We never
 
 Each device has a stable `deviceId` (uuid in localStorage) used for tie-breaking
 and for the `events` primary key.
+
+### Non-log data (roster, tournaments, games)
+
+The longest-chain merge is only for event logs. The mutable rows sync more
+simply, and all three reconcile triggers run the same pass (startup, `online`,
+and tab `visibilitychange`):
+
+- **Roster**: whole-document LWW on `updatedAt` (section 5). The newer doc wins
+  wholesale; a local doc that's newer than the mirror is re-pushed to catch up
+  failed offline writes.
+- **Tournaments & games**: merged by id. Field values follow LWW on `updatedAt`
+  (local wins ties, since the live tablet is authoritative), and `deletedAt` is
+  **sticky** -- a tombstone from either side survives a later edit on the other,
+  so a delete is never resurrected. This matters because the merge is otherwise
+  add-only (union of both sides); without a syncing tombstone, a row deleted on
+  one device would reappear from another's copy. Backfill that synthesizes a
+  tournament for an orphan game ignores tombstoned games for the same reason.
 
 ## 8. Rotation engine
 

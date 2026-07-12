@@ -56,6 +56,8 @@ interface AppState {
   currentTournamentId: Id;
   ready: boolean;
   players: Player[];
+  /** Last-write-wins clock for the roster document; drives cross-device merge. */
+  rosterUpdatedAt: number;
   tournaments: Tournament[];
   games: GameMeta[];
   currentGameId: Id | null;
@@ -102,6 +104,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentTournamentId: getCurrentTournamentId(),
   ready: false,
   players: [],
+  rosterUpdatedAt: 0,
   tournaments: [],
   games: [],
   currentGameId: null,
@@ -114,7 +117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const games = (await repo.listGames()).map(withTeamDefaults);
     const logs: Record<Id, EventEnvelope[]> = {};
     for (const g of games) logs[g.gameId] = await repo.loadLog(g.gameId);
-    const currentGameId = games.at(-1)?.gameId ?? null;
+    const currentGameId = lastLiveGameId(games);
 
     const loaded = await repo.listTournaments();
     const { tournaments, changed } = backfillTournaments(
@@ -129,6 +132,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({
       players: roster?.players ?? [],
+      rosterUpdatedAt: roster?.updatedAt ?? 0,
       tournaments,
       games,
       logs,
@@ -167,6 +171,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       gameId,
       name: opts.name,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       tournamentId: get().currentTournamentId,
       ourTeam: opts.ourTeam,
       theirTeam: opts.theirTeam,
@@ -195,7 +200,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateGameMeta: (gameId, patch) => {
     const games = get().games.map((g) =>
-      g.gameId === gameId ? { ...g, ...patch } : g,
+      g.gameId === gameId ? { ...g, ...patch, updatedAt: Date.now() } : g,
     );
     set({ games });
     void get().repo.saveGames(games);
@@ -207,6 +212,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       id: newId(),
       name: name.trim() || new Date().toLocaleDateString(),
       createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
     const tournaments = [...get().tournaments, t];
     set({ tournaments, currentTournamentId: t.id });
@@ -218,7 +224,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   renameTournament: (id, name) => {
     const tournaments = get().tournaments.map((t) =>
-      t.id === id ? { ...t, name } : t,
+      t.id === id ? { ...t, name, updatedAt: Date.now() } : t,
     );
     set({ tournaments });
     void get().repo.saveTournaments(tournaments);
@@ -228,36 +234,40 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteTournament: (id) => {
     const { tournaments, games, logs, currentGameId, currentTournamentId, repo } =
       get();
-    const removedIds = games
-      .filter((g) => g.tournamentId === id)
-      .map((g) => g.gameId);
-    const removed = new Set(removedIds);
-    const remainingGames = games.filter((g) => !removed.has(g.gameId));
-    const remainingTournaments = tournaments.filter((t) => t.id !== id);
-    const nextLogs = { ...logs };
-    for (const gid of removedIds) delete nextLogs[gid];
-    const nextGameId =
-      currentGameId && removed.has(currentGameId) ? null : currentGameId;
+    // Soft-delete: tombstone the tournament and its games so the deletion syncs
+    // (the add-only merge would otherwise resurrect them on other devices).
+    const deletedAt = Date.now();
+    const nextTournaments = tournaments.map((t) =>
+      t.id === id ? { ...t, deletedAt, updatedAt: deletedAt } : t,
+    );
+    const nextGames = games.map((g) =>
+      g.tournamentId === id && !g.deletedAt
+        ? { ...g, deletedAt, updatedAt: deletedAt }
+        : g,
+    );
+    const currentDeleted = nextGames.some(
+      (g) => g.gameId === currentGameId && g.deletedAt,
+    );
+    const nextGameId = currentDeleted ? null : currentGameId;
 
     set({
-      tournaments: remainingTournaments,
-      games: remainingGames,
-      logs: nextLogs,
+      tournaments: nextTournaments,
+      games: nextGames,
       currentGameId: nextGameId,
-      events: nextGameId ? (nextLogs[nextGameId] ?? []) : [],
+      events: nextGameId ? (logs[nextGameId] ?? []) : [],
     });
 
-    void repo.deleteGames(removedIds);
-    void repo.deleteTournament(id);
-    pushRemote(() => remote!.deleteGames(removedIds));
-    pushRemote(() => remote!.deleteTournament(id));
+    void repo.saveTournaments(nextTournaments);
+    void repo.saveGames(nextGames);
+    pushRemote(() => remote!.saveTournaments(nextTournaments));
+    pushRemote(() => remote!.saveGames(nextGames));
 
     // Keep a valid current tournament: fall back to the newest survivor, or a
     // fresh one when the last tournament is deleted.
     if (currentTournamentId === id) {
-      const next = [...remainingTournaments].sort(
-        (a, b) => b.createdAt - a.createdAt,
-      )[0];
+      const next = nextTournaments
+        .filter((t) => !t.deletedAt)
+        .sort((a, b) => b.createdAt - a.createdAt)[0];
       if (next) get().setCurrentTournament(next.id);
       else get().createTournament('');
     }
@@ -315,6 +325,39 @@ function withTeamDefaults(meta: GameMeta): GameMeta {
   };
 }
 
+/** Most recently listed game that hasn't been soft-deleted. */
+function lastLiveGameId(games: GameMeta[]): Id | null {
+  for (let i = games.length - 1; i >= 0; i--) {
+    if (!games[i].deletedAt) return games[i].gameId;
+  }
+  return null;
+}
+
+/**
+ * Merge remote and local rows by id. Field values follow last-write-wins on
+ * `updatedAt` (local wins ties, since the live tablet is the source of truth),
+ * and a soft-delete tombstone is sticky: a delete from either side survives a
+ * later edit on the other, so deletions can't be resurrected by the add-only
+ * merge.
+ */
+function mergeRows<T extends { updatedAt?: number; deletedAt?: number }>(
+  remote: T[],
+  local: T[],
+  key: (row: T) => Id,
+): T[] {
+  const byId = new Map<Id, T>();
+  const consider = (row: T) => {
+    const prev = byId.get(key(row));
+    const winner =
+      !prev || (row.updatedAt ?? 0) >= (prev.updatedAt ?? 0) ? row : prev;
+    const deletedAt = prev?.deletedAt ?? row.deletedAt;
+    byId.set(key(row), deletedAt ? { ...winner, deletedAt } : winner);
+  };
+  for (const row of remote) consider(row);
+  for (const row of local) consider(row);
+  return [...byId.values()];
+}
+
 /**
  * Synthesize a tournament record for any tournamentId referenced by a game (or
  * the current pointer) that has none, so every game groups under a named
@@ -328,7 +371,7 @@ function backfillTournaments(
   const known = new Set(tournaments.map((t) => t.id));
   const earliest = new Map<Id, number>();
   for (const g of games) {
-    if (known.has(g.tournamentId)) continue;
+    if (g.deletedAt || known.has(g.tournamentId)) continue;
     const at = earliest.get(g.tournamentId);
     if (at === undefined || g.createdAt < at) earliest.set(g.tournamentId, g.createdAt);
   }
@@ -351,12 +394,12 @@ function persistRoster(
   set: (partial: Partial<AppState>) => void,
   players: Player[],
 ): void {
-  set({ players });
   const roster: Roster = {
     players,
     updatedAt: Date.now(),
     updatedBy: get().deviceId,
   };
+  set({ players, rosterUpdatedAt: roster.updatedAt });
   void get().repo.saveRoster(roster);
   pushRemote(() => remote!.saveRoster(roster));
 }
@@ -402,33 +445,46 @@ async function reconcileRemote(
       remote.listGames(),
     ]);
 
-    const tById = new Map<Id, Tournament>();
-    for (const t of remoteTournaments) tById.set(t.id, t);
-    for (const t of get().tournaments) tById.set(t.id, t);
-    const tournaments = [...tById.values()].sort((a, b) => a.createdAt - b.createdAt);
+    const tournaments = mergeRows(remoteTournaments, get().tournaments, (t) => t.id).sort(
+      (a, b) => a.createdAt - b.createdAt,
+    );
     await get().repo.saveTournaments(tournaments);
 
-    const byId = new Map<Id, GameMeta>();
-    for (const g of remoteGames) byId.set(g.gameId, withTeamDefaults(g));
-    for (const g of get().games) byId.set(g.gameId, g);
-    const games = [...byId.values()].sort((a, b) => a.createdAt - b.createdAt);
+    const games = mergeRows(
+      remoteGames.map(withTeamDefaults),
+      get().games,
+      (g) => g.gameId,
+    ).sort((a, b) => a.createdAt - b.createdAt);
 
     const logs = { ...get().logs };
     for (const g of games) {
+      if (g.deletedAt) continue;
       logs[g.gameId] = await syncGame(remote, g.gameId, logs[g.gameId] ?? []);
       await get().repo.saveLog(g.gameId, logs[g.gameId]);
     }
     await get().repo.saveGames(games);
 
+    // Roster is a single document; adopt whichever side's is newer
+    // (last-write-wins), and re-push a newer local one to catch up failed
+    // offline writes.
     let players = get().players;
-    if (players.length === 0 && remoteRoster) {
+    let rosterUpdatedAt = get().rosterUpdatedAt;
+    if (remoteRoster && remoteRoster.updatedAt > rosterUpdatedAt) {
       players = remoteRoster.players;
+      rosterUpdatedAt = remoteRoster.updatedAt;
       await get().repo.saveRoster(remoteRoster);
+    } else if (rosterUpdatedAt > (remoteRoster?.updatedAt ?? 0)) {
+      pushRemote(() =>
+        remote!.saveRoster({ players, updatedAt: rosterUpdatedAt, updatedBy: get().deviceId }),
+      );
     }
 
-    const currentGameId = get().currentGameId ?? games.at(-1)?.gameId ?? null;
+    const prevId = get().currentGameId;
+    const stillLive = games.some((g) => g.gameId === prevId && !g.deletedAt);
+    const currentGameId = stillLive ? prevId : lastLiveGameId(games);
     set({
       players,
+      rosterUpdatedAt,
       tournaments,
       games,
       logs,

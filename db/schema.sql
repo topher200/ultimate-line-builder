@@ -13,7 +13,9 @@ create table if not exists rosters (
 create table if not exists tournaments (
   id text primary key,
   name text not null,
-  created_at bigint not null
+  created_at bigint not null,
+  updated_at bigint,           -- last-write-wins clock for cross-device edits
+  deleted_at bigint            -- soft-delete tombstone; null = live
 );
 
 create table if not exists games (
@@ -22,12 +24,20 @@ create table if not exists games (
   created_at bigint not null,
   tournament_id text not null,
   our_team text not null default 'Rampage',
-  their_team text not null default 'Opponent'
+  their_team text not null default 'Opponent',
+  updated_at bigint,           -- last-write-wins clock for cross-device edits
+  deleted_at bigint            -- soft-delete tombstone; null = live
 );
 
 -- Backfill for projects provisioned before team names existed.
 alter table games add column if not exists our_team text not null default 'Rampage';
 alter table games add column if not exists their_team text not null default 'Opponent';
+
+-- Backfill for projects provisioned before last-write-wins + soft-delete existed.
+alter table tournaments add column if not exists updated_at bigint;
+alter table tournaments add column if not exists deleted_at bigint;
+alter table games add column if not exists updated_at bigint;
+alter table games add column if not exists deleted_at bigint;
 
 create table if not exists events (
   id text primary key,          -- event uuid, stable across devices
