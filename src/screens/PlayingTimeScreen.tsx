@@ -8,7 +8,6 @@ import {
   type GenderView,
   type LineView,
 } from '../components/viewFilter.ts';
-import { GameSettings } from '../components/GameSettings.tsx';
 
 type SortKey = 'game' | 'day' | 'tourn';
 
@@ -91,7 +90,7 @@ export function PlayingTimeScreen() {
       <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
         <h1 className="text-2xl font-bold">Playing time</h1>
         <p className="rounded-lg bg-slate-800 p-6 text-center text-slate-400">
-          Load a game from the Games tab to see playing time and predictions.
+          Load a game from the Games tab to see playing time.
         </p>
       </div>
     );
@@ -103,12 +102,10 @@ export function PlayingTimeScreen() {
         <h1 className="text-2xl font-bold">Playing time</h1>
         <p className="text-sm text-slate-400">
           {meta?.ourTeam} vs {meta?.theirTeam}
-          {tournament && <> &middot; {tournament.name}</>} &middot; points played
-          this game, day, and tournament
+          {tournament && <> &middot; {tournament.name}</>}
         </p>
       </div>
 
-      <GameSettings />
       <ViewFilterBar
         gender={genderView}
         line={lineView}
