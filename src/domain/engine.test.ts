@@ -76,9 +76,14 @@ describe('computeTargets', () => {
     expect(t['mo1']).toBeCloseTo(t['mo4']);
   });
 
-  it('never exceeds the number of points in the game', () => {
+  it('never exceeds the points that a player line actually plays', () => {
+    // Even O/D split => each line plays ~10 of the 20 points, and a player only
+    // ever plays their own line, so no goal can exceed that.
     const t = computeTargets(roster, 20, 0);
-    for (const v of Object.values(t)) expect(v).toBeLessThanOrEqual(20);
+    for (const v of Object.values(t)) expect(v).toBeLessThanOrEqual(10);
+    // The top-rated O player wants every O point; the cap lets the goal reach
+    // it without overshooting into points that line never plays.
+    expect(t['mo1']).toBeCloseTo(10);
   });
 
   it('always scopes goals per line, so a smaller line means bigger goals', () => {

@@ -60,14 +60,20 @@ export function computeTargets(
   const remaining = Math.max(0, expectedPoints - baseline.totalPoints);
   const remO = remaining * oShare;
   const remD = remaining - remO;
+  // A player only ever plays their own line's points, so a goal can't exceed
+  // the number of points that line plays over the whole game (not the whole-game
+  // total). Capping at expectedPoints instead would hand a star in a line more
+  // goal than there are points for them to play.
+  const oPoints = expectedPoints * oShare;
+  const dPoints = expectedPoints - oPoints;
 
   for (const gender of ['MMP', 'WMP'] as Gender[]) {
     const perPoint = averageSlots(gender, expectedPoints);
     const ofGender = active.filter((p) => p.gender === gender);
-    const assign = (pool: Player[], remInScope: number) =>
-      assignPool(pool, perPoint, remInScope, mode, baseline.played, expectedPoints, targets);
-    assign(ofGender.filter((p) => p.line === 'O'), remO);
-    assign(ofGender.filter((p) => p.line === 'D'), remD);
+    const assign = (pool: Player[], remInScope: number, linePoints: number) =>
+      assignPool(pool, perPoint, remInScope, mode, baseline.played, linePoints, targets);
+    assign(ofGender.filter((p) => p.line === 'O'), remO, oPoints);
+    assign(ofGender.filter((p) => p.line === 'D'), remD, dPoints);
   }
   return targets;
 }
@@ -88,7 +94,7 @@ function assignPool(
   pool.forEach((p, i) => {
     const base = baselinePlayed[p.id] ?? 0;
     // Head start plus this pool's share of the remaining points, capped at the
-    // whole game.
+    // number of points this line plays.
     targets[p.id] = Math.min(cap, base + (remainingSlots * weights[i]) / sum);
   });
 }
