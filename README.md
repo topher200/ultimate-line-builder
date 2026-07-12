@@ -169,7 +169,8 @@ npm run dev        # Vite dev server (host:true, so reachable from the tablet on
 npm run test       # Vitest (domain core)
 npm run typecheck  # tsc, no emit
 npm run build      # production PWA build -> dist/
-npm run preview    # serve the production build locally
+npm run preview    # build, then serve via wrangler dev (production-like)
+npm run deploy     # build and publish to Cloudflare Workers
 ```
 
 - **Stack:** React + TypeScript + Vite, installable PWA (vite-plugin-pwa),
@@ -179,20 +180,18 @@ npm run preview    # serve the production build locally
 - **Cloud (later):** Supabase (Postgres) storing per-game event logs, with
   client-side longest-chain merge on reconnect.
 
-### Deploy (Cloudflare Pages)
+### Deploy (Cloudflare Workers)
 
-Hosted on Cloudflare Pages via its GitHub integration: connect the repo, set
-build command `npm run build` and output dir `dist`, and it builds on every push
-to `main`. `public/_redirects` provides the SPA fallback (`/* /index.html 200`)
-so React Router deep-links resolve on reload, and `.nvmrc` pins the build to Node
-22. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as environment
-variables in the Pages project (they're inlined at build time; the local `.env`
-is gitignored). HTTPS is automatic, which the PWA needs for install + offline.
-Testing PWA install locally requires `npm run build && npm run preview` (the
-service worker is production-only).
-
-`netlify.toml` is also committed, so the site can still be deployed to Netlify
-as a fallback.
+Hosted on Cloudflare Workers (static assets) via the GitHub integration: connect
+the repo and it runs `npm run build` and deploys on every push to `main`.
+`wrangler.jsonc` holds the Worker config; its `not_found_handling:
+"single-page-application"` serves `index.html` for unknown paths so React Router
+deep-links resolve on reload, and `.nvmrc` pins the build to Node 22. Set
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as environment variables
+on the Worker (they're inlined at build time; the local `.env` is gitignored).
+HTTPS is automatic, which the PWA needs for install + offline. `npm run deploy`
+publishes from the command line, and `npm run preview` builds and serves the
+production bundle via `wrangler dev` (the service worker is production-only).
 
 ### Source layout
 
