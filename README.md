@@ -1,14 +1,10 @@
 # Ultimate Line Builder
 
-A tablet-first web app for calling lines in mixed Ultimate Frisbee. A captain
+A phone/tablet-first web app for calling lines in mixed Ultimate Frisbee. A captain
 or assistant coach uses it on the sideline to decide which 7 players take the
 field each point, while the app keeps track of gender ratio, offense/defense,
 and everyone's playing time so nobody gets frozen out and the best players play
 the biggest points.
-
-> **For agents / new contributors:** this README is the source of truth for the
-> domain. Read it fully before touching code. The deep data-model, storage/sync,
-> and rotation-engine spec lives in [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 
 ---
 
@@ -23,10 +19,10 @@ your head in the moment. A captain has to juggle:
 - **Playing your best players more.** In competitive points your top players
   should be out there. Example: your best D-line handler should be on the field
   for essentially every competitive D point.
-- **Game competitiveness.** An even matchup is fully competitive. A planned
-  blowout (16-seed vs 1-seed) or a game where you've fallen behind by 3+ is a
-  chance to rest stars and give bench players time. The captain toggles this
-  mid-game based on the score.
+- **Game competitiveness.** An even matchup in an important game is fully
+  competitive. A planned blowout (16-seed vs 1-seed) or a game where you've
+  fallen behind by 3+ is a chance to rest stars and give bench players time. The
+  captain toggles this mid-game based on the score.
 - **Gender ratio.** Mixed Ultimate alternates the male-matching / woman-matching
   ratio in a fixed pattern (see below). Tracking it and calling a line that
   matches is error-prone.
@@ -35,9 +31,9 @@ your head in the moment. A captain has to juggle:
   defensive points. Only rarely (a few times a weekend, in non-competitive
   games) do you cross lines to balance playing time.
 
-The app removes this mental load: you tell it the situation, it proposes a
-legal, fair, strategy-appropriate line of 7, you tweak if needed, record the
-result, and it does it again for the next point.
+The app removes this mental load: you tell it the situation, it proposes a fair,
+strategy-appropriate line of 7, you tweak if needed, record the result, and it
+does it again for the next point.
 
 ## 2. How the game works (rules the app encodes)
 
@@ -58,8 +54,8 @@ result, and it does it again for the next point.
 - At the **start of the game** the captain declares O or D.
 - At **half time**, possession resets: if we **started the game on D**, we start
   the second half on **O** (and vice versa).
-- There is always a manual **force O / force D** toggle to override the derived
-  possession.
+- There is always a manual **force O line / force D line** toggle to override
+  the derived possession.
 
 ### Gender ratio
 
@@ -137,24 +133,7 @@ These are internally consistent: the point pool is `7 x expectedPoints`, and one
 player's predicted points are points removed from everyone else's pool. The
 expected total points for the game is an editable box (default **20**).
 
-## 4. Screens
-
-| Screen | Audience | Shows ratings? | Purpose |
-| --- | --- | --- | --- |
-| **Roster** | Head coach | Yes (sensitive) | Manage players: gender, O/D line, competitiveness slider, active toggle. |
-| **Game** | Assistant coach | **No** | Live line calling: current line with MMP/WMP marked, +1 Us / +1 Them, force O/D, subs, expected-points box, per-player played/goal/predicted, game-competitiveness slider. |
-| **Predictor** | Coach | Yes | Simulate a game assuming O and D points trade, showing each player's predicted points over their target. |
-| **Doctor** | Coach | n/a | A panel (on Roster) flagging misconfiguration: not enough MMPs/WMPs for a legal line, impossible to guarantee everyone a point, etc. |
-
-The **competitiveness rating is sensitive** (players may see the tablet) and
-must never appear on the Game screen. The **game-competitiveness** slider is
-*not* sensitive (it's about the game, not a person) and lives on the Game screen
-for in-the-moment adjustment.
-
-Every player has an **Active** toggle (default on). Toggling off (e.g. injury)
-removes them from rotation until toggled back on.
-
-## 5. Architecture
+## 4. Architecture
 
 Four layers, cleanly separated:
 
@@ -181,7 +160,7 @@ one with more points and archive the loser so nothing is lost). Full spec,
 including the event types, the rotation algorithm, and the merge rules, is in
 [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 
-## 6. Build & run
+## 5. Build & run
 
 ```bash
 npm install
