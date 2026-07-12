@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
@@ -51,15 +51,21 @@ function ActiveGame() {
   const updateGameMeta = useAppStore((s) => s.updateGameMeta);
 
   // Which line takes the field. Defaults to the line matching possession; the
-  // coach can call the other line for a point (it resets each new point).
+  // coach can call the other line via "Play this line". The choice is keyed to
+  // the point it was made on, so advancing the point falls back to the
+  // possession line by deriving during render, with no post-render state sync
+  // (which would paint a stale frame before it corrected).
   const defaultLine: Line = game.nextPossession;
-  const [fieldedLine, setFieldedLine] = useState<Line>(defaultLine);
-  useEffect(() => setFieldedLine(defaultLine), [game.totalPoints, defaultLine]);
+  const [swap, setSwap] = useState<{ point: number; line: Line } | null>(null);
+  const fieldedLine: Line =
+    swap?.point === game.totalPoints ? swap.line : defaultLine;
 
-  // Bumping this re-picks the line with jitter, so a reshuffle varies the slack
-  // slots. It resets to a clean deterministic pick each new point.
-  const [reshuffle, setReshuffle] = useState(0);
-  useEffect(() => setReshuffle(0), [game.totalPoints]);
+  // Reshuffle re-picks the line with jitter to vary the slack slots. Also keyed
+  // to the point, so it resets to a clean deterministic pick each new point.
+  const [reshuffle, setReshuffle] = useState<{ point: number; n: number } | null>(
+    null,
+  );
+  const reshuffleN = reshuffle?.point === game.totalPoints ? reshuffle.n : 0;
 
   const context = {
     possession: game.nextPossession,
@@ -67,14 +73,20 @@ function ActiveGame() {
     line: fieldedLine,
   };
   const suggestion = useMemo(
-    () => selectLine(game, players, context, targets, { jitter: reshuffle > 0 ? 2 : 0 }),
+    () => selectLine(game, players, context, targets, { jitter: reshuffleN > 0 ? 2 : 0 }),
     // Regenerate when the point context changes or a reshuffle is requested.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [game.totalPoints, game.nextPossession, game.nextMajority, game.mode, fieldedLine, reshuffle],
+    [game.totalPoints, game.nextPossession, game.nextMajority, game.mode, fieldedLine, reshuffleN],
   );
 
+  // Reset the editable lineup whenever the suggestion recomputes. Done during
+  // render (not in an effect) so the new lineup paints in the same frame.
   const [lineup, setLineup] = useState<LineupEntry[]>(suggestion.lineup);
-  useEffect(() => setLineup(suggestion.lineup), [suggestion]);
+  const [shownSuggestion, setShownSuggestion] = useState(suggestion);
+  if (shownSuggestion !== suggestion) {
+    setShownSuggestion(suggestion);
+    setLineup(suggestion.lineup);
+  }
 
   const byId = (id: string) => players.find((p) => p.id === id)!;
   const inLineup = new Set(lineup.map((l) => l.playerId));
@@ -157,7 +169,9 @@ function ActiveGame() {
           </span>
           <button
             className="rounded bg-slate-600 px-3 py-1 text-sm"
-            onClick={() => setReshuffle((n) => n + 1)}
+            onClick={() =>
+              setReshuffle({ point: game.totalPoints, n: reshuffleN + 1 })
+            }
           >
             Reshuffle
           </button>
@@ -222,7 +236,7 @@ function ActiveGame() {
                     {!fielded && (
                       <button
                         className="rounded bg-emerald-700 px-2 py-0.5 text-xs font-semibold"
-                        onClick={() => setFieldedLine(line)}
+                        onClick={() => setSwap({ point: game.totalPoints, line })}
                       >
                         Play this line
                       </button>
