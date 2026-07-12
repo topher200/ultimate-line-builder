@@ -268,8 +268,16 @@ function ActiveGame() {
         <button className="rounded bg-slate-600 px-4 py-2" onClick={undoLast}>
           Undo last point
         </button>
-        <button className="rounded bg-slate-600 px-4 py-2" onClick={startSecondHalf}>
-          Start 2nd half
+        <button
+          className={`rounded px-4 py-2 ${
+            game.half === 2
+              ? 'cursor-default bg-slate-700 text-slate-500'
+              : 'bg-slate-600'
+          }`}
+          onClick={startSecondHalf}
+          disabled={game.half === 2}
+        >
+          {game.half === 2 ? '2nd half started' : 'Start 2nd half'}
         </button>
       </div>
 
