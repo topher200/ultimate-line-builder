@@ -170,7 +170,6 @@ npm run test       # Vitest (domain core)
 npm run typecheck  # tsc, no emit
 npm run build      # production PWA build -> dist/
 npm run preview    # build, then serve via wrangler dev (production-like)
-npm run deploy     # build and publish to Cloudflare Workers
 ```
 
 - **Stack:** React + TypeScript + Vite, installable PWA (vite-plugin-pwa),
@@ -189,15 +188,15 @@ the repo and it runs `npm run build` and deploys on every push to `main`.
 deep-links resolve on reload, and `.nvmrc` pins the build to Node 22. Set
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as environment variables
 on the Worker (they're inlined at build time; the local `.env` is gitignored).
-HTTPS is automatic, which the PWA needs for install + offline. `npm run deploy`
-publishes from the command line, and `npm run preview` builds and serves the
-production bundle via `wrangler dev` (the service worker is production-only).
+HTTPS is automatic, which the PWA needs for install + offline. `npm run preview`
+builds and serves the production bundle via `wrangler dev` (the service worker is
+production-only).
 
 ### Source layout
 
 ```
 src/
-  domain/        pure TS, no React, fully unit-tested (57 tests):
+  domain/        pure TS, no React, fully unit-tested:
                    types, rules (ABBA/possession), fold (deriveState),
                    engine (targets/selectLine/predictGame), aggregate, doctor
   persistence/   Repository interface + LocalRepository
