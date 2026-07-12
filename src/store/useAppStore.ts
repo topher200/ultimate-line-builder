@@ -85,6 +85,7 @@ interface AppState {
   }) => void;
   loadGame: (gameId: Id) => void;
   updateGameMeta: (gameId: Id, patch: Partial<Pick<GameMeta, 'name' | 'ourTeam' | 'theirTeam'>>) => void;
+  deleteGame: (gameId: Id) => void;
   createTournament: (name: string) => Id;
   renameTournament: (id: Id, name: string) => void;
   deleteTournament: (id: Id) => void;
@@ -207,6 +208,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ games });
     void get().repo.saveGames(games);
     pushRemote(() => remote!.saveGames(games));
+  },
+
+  deleteGame: (gameId) => {
+    const { games, logs, currentGameId, repo } = get();
+    // Soft-delete: tombstone the game so the deletion syncs (the add-only merge
+    // would otherwise resurrect it on other devices).
+    const deletedAt = Date.now();
+    const nextGames = games.map((g) =>
+      g.gameId === gameId ? { ...g, deletedAt, updatedAt: deletedAt } : g,
+    );
+    const nextGameId = currentGameId === gameId ? null : currentGameId;
+    set({
+      games: nextGames,
+      currentGameId: nextGameId,
+      events: nextGameId ? (logs[nextGameId] ?? []) : [],
+    });
+    void repo.saveGames(nextGames);
+    pushRemote(() => remote!.saveGames(nextGames));
   },
 
   createTournament: (name) => {

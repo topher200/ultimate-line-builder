@@ -28,6 +28,7 @@ export function GamesScreen() {
   const createTournament = useAppStore((s) => s.createTournament);
   const renameTournament = useAppStore((s) => s.renameTournament);
   const deleteTournament = useAppStore((s) => s.deleteTournament);
+  const deleteGame = useAppStore((s) => s.deleteGame);
   const setCurrentTournament = useAppStore((s) => s.setCurrentTournament);
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
@@ -105,6 +106,15 @@ export function GamesScreen() {
             }
           }}
           onOpen={open}
+          onDeleteGame={(g) => {
+            if (
+              window.confirm(
+                `Delete "${g.ourTeam} vs ${g.theirTeam}"? This cannot be undone.`,
+              )
+            ) {
+              deleteGame(g.gameId);
+            }
+          }}
         />
       ))}
 
@@ -127,6 +137,7 @@ function TournamentSection({
   onMakeCurrent,
   onDelete,
   onOpen,
+  onDeleteGame,
 }: {
   tournament: Tournament;
   games: GameMeta[];
@@ -137,6 +148,7 @@ function TournamentSection({
   onMakeCurrent: () => void;
   onDelete: () => void;
   onOpen: (gameId: string) => void;
+  onDeleteGame: (game: GameMeta) => void;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -177,6 +189,7 @@ function TournamentSection({
           state={deriveState(logs[g.gameId] ?? [])}
           current={g.gameId === currentGameId}
           onOpen={() => onOpen(g.gameId)}
+          onDelete={() => onDeleteGame(g)}
         />
       ))}
     </div>
@@ -188,42 +201,54 @@ function GameRow({
   state,
   current,
   onOpen,
+  onDelete,
 }: {
   game: GameMeta;
   state: ReturnType<typeof deriveState>;
   current: boolean;
   onOpen: () => void;
+  onDelete: () => void;
 }) {
   return (
-    <button
-      className={`flex items-center justify-between rounded-lg p-4 text-left ${
+    <div
+      className={`flex items-center gap-3 rounded-lg p-4 ${
         current ? 'bg-slate-700 ring-2 ring-emerald-500' : 'bg-slate-800'
       }`}
-      onClick={onOpen}
     >
-      <div>
-        <div className="text-lg font-semibold">
-          {game.ourTeam} <span className="text-slate-500">vs</span> {game.theirTeam}
+      <button
+        className="flex flex-1 items-center justify-between text-left"
+        onClick={onOpen}
+      >
+        <div>
+          <div className="text-lg font-semibold">
+            {game.ourTeam} <span className="text-slate-500">vs</span> {game.theirTeam}
+          </div>
+          <div className="text-sm text-slate-400">
+            {new Date(game.createdAt).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}{' '}
+            &middot; {state.totalPoints} pts
+          </div>
         </div>
-        <div className="text-sm text-slate-400">
-          {new Date(game.createdAt).toLocaleString([], {
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          })}{' '}
-          &middot; {state.totalPoints} pts
+        <div className="text-right">
+          <div className="text-2xl font-bold tabular-nums">
+            {state.score.us} <span className="text-slate-500">-</span> {state.score.them}
+          </div>
+          {current && (
+            <div className="text-xs font-semibold uppercase text-emerald-400">Open</div>
+          )}
         </div>
-      </div>
-      <div className="text-right">
-        <div className="text-2xl font-bold tabular-nums">
-          {state.score.us} <span className="text-slate-500">-</span> {state.score.them}
-        </div>
-        {current && (
-          <div className="text-xs font-semibold uppercase text-emerald-400">Open</div>
-        )}
-      </div>
-    </button>
+      </button>
+      <button
+        className="text-xs text-slate-500 underline hover:text-red-400"
+        onClick={onDelete}
+      >
+        Delete
+      </button>
+    </div>
   );
 }
 
