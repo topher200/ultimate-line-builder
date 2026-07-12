@@ -47,6 +47,11 @@ export type EventPayload =
       scoredBy: 'us' | 'them';
     }
   | { kind: 'ExpectedPointsChanged'; value: number }
+  | {
+      kind: 'StartConfigChanged';
+      startingPossession?: Possession;
+      startingMajority?: MajorityGender;
+    }
   | { kind: 'ModeChanged'; value: Mode }
   | { kind: 'PossessionOverridden'; value: Possession }
   | { kind: 'MajorityOverridden'; value: MajorityGender }

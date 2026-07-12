@@ -53,6 +53,10 @@ export function deriveState(events: EventEnvelope[]): GameState {
       case 'ExpectedPointsChanged':
         expectedPoints = p.value;
         break;
+      case 'StartConfigChanged':
+        if (p.startingPossession) startingPossession = p.startingPossession;
+        if (p.startingMajority) startingMajority = p.startingMajority;
+        break;
       case 'ModeChanged':
         mode = p.value;
         // Re-plan the remaining points from here: pin the baseline to now.

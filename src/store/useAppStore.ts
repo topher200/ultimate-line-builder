@@ -94,6 +94,8 @@ interface AppState {
   startSecondHalf: () => void;
   setMode: (value: Mode) => void;
   setExpectedPoints: (value: number) => void;
+  setStartingPossession: (value: Possession) => void;
+  setStartingMajority: (value: MajorityGender) => void;
   overridePossession: (value: Possession) => void;
   overrideMajority: (value: MajorityGender) => void;
 }
@@ -310,6 +312,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMode: (value) => appendEvent(get, set, { kind: 'ModeChanged', value }),
   setExpectedPoints: (value) =>
     appendEvent(get, set, { kind: 'ExpectedPointsChanged', value }),
+  setStartingPossession: (value) =>
+    appendEvent(get, set, { kind: 'StartConfigChanged', startingPossession: value }),
+  setStartingMajority: (value) =>
+    appendEvent(get, set, { kind: 'StartConfigChanged', startingMajority: value }),
   overridePossession: (value) =>
     appendEvent(get, set, { kind: 'PossessionOverridden', value }),
   overrideMajority: (value) =>

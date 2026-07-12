@@ -48,6 +48,8 @@ function ActiveGame() {
   const undoLast = useAppStore((s) => s.undoLast);
   const startSecondHalf = useAppStore((s) => s.startSecondHalf);
   const overrideMajority = useAppStore((s) => s.overrideMajority);
+  const setStartingPossession = useAppStore((s) => s.setStartingPossession);
+  const setStartingMajority = useAppStore((s) => s.setStartingMajority);
   const updateGameMeta = useAppStore((s) => s.updateGameMeta);
 
   // Which line takes the field. Defaults to the line matching possession; the
@@ -118,9 +120,24 @@ function ActiveGame() {
               {pointLabel(game.totalPoints + 1, game.nextMajority)}
             </span>
           </div>
-          <div className="text-xs text-slate-500">
-            Started on {game.startingPossession} &middot;{' '}
-            {pointLabel(1, game.startingMajority)}
+          <div className="mt-0.5 flex items-center justify-end gap-1 text-xs text-slate-500">
+            <span>Started on</span>
+            <button
+              className="rounded bg-slate-700 px-2 py-0.5 font-semibold text-slate-200"
+              onClick={() =>
+                setStartingPossession(game.startingPossession === 'O' ? 'D' : 'O')
+              }
+            >
+              {game.startingPossession}
+            </button>
+            <button
+              className="rounded bg-slate-700 px-2 py-0.5 font-semibold text-slate-200"
+              onClick={() =>
+                setStartingMajority(game.startingMajority === 'M' ? 'W' : 'M')
+              }
+            >
+              {pointLabel(1, game.startingMajority)}
+            </button>
           </div>
         </div>
       </div>

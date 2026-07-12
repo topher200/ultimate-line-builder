@@ -57,6 +57,17 @@ describe('deriveState', () => {
     expect(s.mode).toBe(0);
   });
 
+  it('lets StartConfigChanged correct the starting possession and majority', () => {
+    const s = deriveState([
+      start,
+      ev({ kind: 'StartConfigChanged', startingPossession: 'O', startingMajority: 'W' }),
+    ]);
+    expect(s.startingPossession).toBe('O');
+    expect(s.startingMajority).toBe('W');
+    expect(s.nextPossession).toBe('O');
+    expect(s.nextMajority).toBe('W');
+  });
+
   it('counts players and tracks score and next possession after a point', () => {
     const s = deriveState([start, point(['a', 'b'], 'us', 'D', 'M')]);
     expect(s.played).toEqual({ a: 1, b: 1 });
