@@ -199,13 +199,20 @@ npm run preview    # serve the production build locally
 - **Cloud (later):** Supabase (Postgres) storing per-game event logs, with
   client-side longest-chain merge on reconnect.
 
-### Deploy (Netlify)
+### Deploy (Cloudflare Pages)
 
-`netlify.toml` is committed: build command `npm run build`, publish dir `dist`,
-with an SPA redirect so React Router routes resolve. Point a Netlify site at the
-repo (or `netlify deploy`) and it builds on push. HTTPS is automatic, which the
-PWA needs for install + offline. Testing PWA install locally requires
-`npm run build && npm run preview` (the service worker is production-only).
+Hosted on Cloudflare Pages via its GitHub integration: connect the repo, set
+build command `npm run build` and output dir `dist`, and it builds on every push
+to `main`. `public/_redirects` provides the SPA fallback (`/* /index.html 200`)
+so React Router deep-links resolve on reload, and `.nvmrc` pins the build to Node
+22. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as environment
+variables in the Pages project (they're inlined at build time; the local `.env`
+is gitignored). HTTPS is automatic, which the PWA needs for install + offline.
+Testing PWA install locally requires `npm run build && npm run preview` (the
+service worker is production-only).
+
+`netlify.toml` is also committed, so the site can still be deployed to Netlify
+as a fallback.
 
 ### Source layout
 
