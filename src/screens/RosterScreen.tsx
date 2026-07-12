@@ -25,6 +25,7 @@ export function RosterScreen() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [genderView, setGenderView] = useState<GenderView>('ALL');
   const [lineView, setLineView] = useState<LineView>('ALL');
+  const [sort, setSort] = useState<'name' | 'rating'>('name');
 
   const runImport = () => {
     const { players: parsed, errors } = parseRosterText(importText);
@@ -39,7 +40,11 @@ export function RosterScreen() {
   const warnings = runDoctor(players, DEFAULT_EXPECTED_POINTS);
   const sorted = [...players]
     .filter((p) => matchesView(p, genderView, lineView))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) =>
+      sort === 'rating'
+        ? b.competitiveness - a.competitiveness || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name),
+    );
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -137,6 +142,17 @@ export function RosterScreen() {
           shown={sorted.length}
           total={players.length}
         />
+      )}
+
+      {players.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
+          <span className="text-sm font-semibold text-slate-400">Sort</span>
+          <Toggle
+            options={['Name', 'Rating']}
+            value={sort === 'name' ? 'Name' : 'Rating'}
+            onChange={(v) => setSort(v === 'Rating' ? 'rating' : 'name')}
+          />
+        </div>
       )}
 
       <div className="flex flex-col gap-2">
