@@ -4,7 +4,6 @@ import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
 import { computeTargets, selectLine } from '../domain/engine.ts';
 import { pointLabel, slotsForMajority } from '../domain/rules.ts';
-import { Segmented } from '../components/Segmented.tsx';
 import { InlineEdit } from '../components/InlineEdit.tsx';
 import { GameSettings } from '../components/GameSettings.tsx';
 import { GameTimeline } from './GameTimeline.tsx';
@@ -47,7 +46,6 @@ function ActiveGame() {
   const recordPoint = useAppStore((s) => s.recordPoint);
   const undoLast = useAppStore((s) => s.undoLast);
   const startSecondHalf = useAppStore((s) => s.startSecondHalf);
-  const overrideMajority = useAppStore((s) => s.overrideMajority);
   const setStartingPossession = useAppStore((s) => s.setStartingPossession);
   const setStartingMajority = useAppStore((s) => s.setStartingMajority);
   const updateGameMeta = useAppStore((s) => s.updateGameMeta);
@@ -142,38 +140,11 @@ function ActiveGame() {
         </div>
       </div>
 
-      {/* Point context */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
-        <Segmented
-          options={[
-            { value: 'M', label: '4M:3W' },
-            { value: 'W', label: '3M:4W' },
-          ]}
-          value={game.nextMajority}
-          onChange={overrideMajority}
-        />
-        <div className="flex items-center gap-2">
-          <Segmented
-            options={[
-              { value: 'O', label: 'O line' },
-              { value: 'D', label: 'D line' },
-            ]}
-            value={fieldedLine}
-            onChange={setFieldedLine}
-          />
-          {fieldedLine !== defaultLine && (
-            <span className="text-xs font-semibold text-amber-300">
-              calling {fieldedLine} line on {game.nextPossession === 'O' ? 'offense' : 'defense'}
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* Suggested line */}
       <div className="rounded-lg bg-slate-800 p-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="font-semibold">
-            Line{' '}
+            {fieldedLine} line{' '}
             <span
               className={
                 ratioOk
@@ -191,6 +162,12 @@ function ActiveGame() {
             Reshuffle
           </button>
         </div>
+        {fieldedLine !== defaultLine && (
+          <p className="mb-2 text-xs font-semibold text-amber-300">
+            Playing the {fieldedLine} line on{' '}
+            {game.nextPossession === 'O' ? 'offense' : 'defense'}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {lineup.map((entry) => (
             <PlayerChip
@@ -235,10 +212,21 @@ function ActiveGame() {
           <div className="grid grid-cols-2 gap-3">
             {(['O', 'D'] as Line[]).map((line) => {
               const onBench = bench.filter((p) => p.line === line);
+              const fielded = fieldedLine === line;
               return (
                 <div key={line}>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {line} line
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {line} line{fielded && ' (on field)'}
+                    </span>
+                    {!fielded && (
+                      <button
+                        className="rounded bg-emerald-700 px-2 py-0.5 text-xs font-semibold"
+                        onClick={() => setFieldedLine(line)}
+                      >
+                        Play this line
+                      </button>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {onBench.map((p) => (
