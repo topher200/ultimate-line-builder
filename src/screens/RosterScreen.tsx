@@ -4,6 +4,7 @@ import { runDoctor } from '../domain/doctor.ts';
 import { DEFAULT_EXPECTED_POINTS } from '../domain/defaults.ts';
 import { parseRosterText } from '../domain/rosterImport.ts';
 import { ViewFilterBar } from '../components/ViewFilterBar.tsx';
+import { InlineEdit } from '../components/InlineEdit.tsx';
 import {
   matchesView,
   type GenderView,
@@ -171,10 +172,21 @@ export function RosterScreen() {
               >
                 {p.gender}
               </span>
-              <span className="rounded bg-slate-600 px-2 py-0.5 text-sm">{p.line}</span>
-              <span className={`flex-1 text-lg ${p.active ? '' : 'line-through opacity-60'}`}>
-                {p.name}
-              </span>
+              <button
+                className="rounded bg-slate-600 px-2 py-0.5 text-sm font-semibold"
+                onClick={() =>
+                  updatePlayer(p.id, { line: p.line === 'O' ? 'D' : 'O' })
+                }
+              >
+                {p.line}
+              </button>
+              <InlineEdit
+                value={p.name}
+                onChange={(v) => updatePlayer(p.id, { name: v })}
+                className={`flex-1 text-left text-lg ${
+                  p.active ? '' : 'line-through opacity-60'
+                }`}
+              />
               <button
                 className={`rounded px-3 py-1 text-sm font-semibold ${
                   p.active ? 'bg-emerald-700' : 'bg-slate-600'
