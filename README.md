@@ -9,7 +9,7 @@ the biggest points.
 | Call the line | Track the roster | Predict the game |
 | :---: | :---: | :---: |
 | [![Live game line picker: scoreboard, a suggested line of 7, and the bench](docs/screenshots/game-line-picker.png)](docs/screenshots/game-line-picker.png) | [![Roster with per-player gender, line, and competitiveness rating](docs/screenshots/roster.png)](docs/screenshots/roster.png) | [![Predictor projecting each player's points for the game](docs/screenshots/predictor.png)](docs/screenshots/predictor.png) |
-| Suggests a fair, ratio-correct 7 each point; tweak and record. | One tap to set gender, O/D line, and how much each player should play. | Projects everyone's playing time before the first pull. |
+| Suggests a ratio-correct 7 each point; tweak and record. | One tap to set gender, O/D line, and how much each player should play. | Projects and tracks everyone's playing time. |
 
 ## 1. The problem
 
