@@ -10,12 +10,24 @@ create table if not exists rosters (
   updated_at bigint not null
 );
 
+create table if not exists tournaments (
+  id text primary key,
+  name text not null,
+  created_at bigint not null
+);
+
 create table if not exists games (
   game_id text primary key,
   name text not null,
   created_at bigint not null,
-  tournament_id text not null
+  tournament_id text not null,
+  our_team text not null default 'Rampage',
+  their_team text not null default 'Opponent'
 );
+
+-- Backfill for projects provisioned before team names existed.
+alter table games add column if not exists our_team text not null default 'Rampage';
+alter table games add column if not exists their_team text not null default 'Opponent';
 
 create table if not exists events (
   id text primary key,          -- event uuid, stable across devices
@@ -37,13 +49,16 @@ create index if not exists events_game_seq_idx on events (game_id, seq);
 -- a shared secret. The SECRET key must never be shipped in the web client.
 
 alter table rosters enable row level security;
+alter table tournaments enable row level security;
 alter table games enable row level security;
 alter table events enable row level security;
 
 drop policy if exists "anon rosters" on rosters;
+drop policy if exists "anon tournaments" on tournaments;
 drop policy if exists "anon games" on games;
 drop policy if exists "anon events" on events;
 
 create policy "anon rosters" on rosters for all to anon using (true) with check (true);
+create policy "anon tournaments" on tournaments for all to anon using (true) with check (true);
 create policy "anon games" on games for all to anon using (true) with check (true);
 create policy "anon events" on events for all to anon using (true) with check (true);

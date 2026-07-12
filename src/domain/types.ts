@@ -63,6 +63,12 @@ export interface EventEnvelope {
   payload: EventPayload;
 }
 
+export interface Tournament {
+  id: Id;
+  name: string;
+  createdAt: number;
+}
+
 export interface GameMeta {
   gameId: Id;
   name: string;

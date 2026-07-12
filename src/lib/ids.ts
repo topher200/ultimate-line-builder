@@ -42,9 +42,7 @@ export function getCurrentTournamentId(): string {
   return id;
 }
 
-/** Start a fresh tournament grouping; the next new game joins it. */
-export function rollNewTournamentId(): string {
-  const id = newId();
+/** Remember which tournament new games join. */
+export function setCurrentTournamentId(id: string): void {
   localStorage.setItem(TOURNEY_KEY, id);
-  return id;
 }

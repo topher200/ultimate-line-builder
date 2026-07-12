@@ -5,6 +5,7 @@ import { deriveState } from '../domain/fold.ts';
 import { computeTargets, selectLine } from '../domain/engine.ts';
 import { slotsForMajority } from '../domain/rules.ts';
 import { Segmented } from '../components/Segmented.tsx';
+import { InlineEdit } from '../components/InlineEdit.tsx';
 import { GameSettings } from '../components/GameSettings.tsx';
 import { GameTimeline } from './GameTimeline.tsx';
 import type { Line, LineupEntry, Player } from '../domain/types.ts';
@@ -91,16 +92,18 @@ function ActiveGame() {
       {/* Scoreboard */}
       <div className="flex items-center justify-between rounded-lg bg-slate-800 p-3">
         <div className="flex items-center gap-2 text-3xl font-bold tabular-nums">
-          <EditableName
+          <InlineEdit
             value={meta?.ourTeam ?? 'Us'}
             onChange={(v) => rename({ ourTeam: v })}
+            className="text-lg font-semibold text-slate-300"
           />
           <span>{game.score.us}</span>
           <span className="text-slate-500">-</span>
           <span>{game.score.them}</span>
-          <EditableName
+          <InlineEdit
             value={meta?.theirTeam ?? 'Them'}
             onChange={(v) => rename({ theirTeam: v })}
+            className="text-lg font-semibold text-slate-300"
           />
         </div>
         <div className="text-right text-sm text-slate-400">
@@ -234,45 +237,6 @@ function ActiveGame() {
 
       <GameTimeline events={events} players={players} game={game} targets={targets} />
     </div>
-  );
-}
-
-function EditableName({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={draft}
-        className="w-28 rounded bg-slate-700 px-2 py-1 text-lg"
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          setEditing(false);
-          if (draft.trim()) onChange(draft.trim());
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur();
-        }}
-      />
-    );
-  }
-  return (
-    <button
-      className="text-lg font-semibold text-slate-300 underline decoration-dotted underline-offset-4"
-      onClick={() => {
-        setDraft(value);
-        setEditing(true);
-      }}
-    >
-      {value}
-    </button>
   );
 }
 

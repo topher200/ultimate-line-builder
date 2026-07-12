@@ -12,12 +12,13 @@ import type {
   Player,
   Possession,
   Roster,
+  Tournament,
 } from '../domain/types.ts';
 import {
   getCurrentTournamentId,
   getDeviceId,
   newId,
-  rollNewTournamentId,
+  setCurrentTournamentId,
 } from '../lib/ids.ts';
 import { LocalRepository, type Repository } from '../persistence/repository.ts';
 import { isSupabaseConfigured } from '../persistence/supabaseClient.ts';
@@ -55,6 +56,7 @@ interface AppState {
   currentTournamentId: Id;
   ready: boolean;
   players: Player[];
+  tournaments: Tournament[];
   games: GameMeta[];
   currentGameId: Id | null;
   /** Every game's log, kept in memory for cross-game aggregates. */
@@ -81,7 +83,9 @@ interface AppState {
   }) => void;
   loadGame: (gameId: Id) => void;
   updateGameMeta: (gameId: Id, patch: Partial<Pick<GameMeta, 'name' | 'ourTeam' | 'theirTeam'>>) => void;
-  startNewTournament: () => void;
+  createTournament: (name: string) => Id;
+  renameTournament: (id: Id, name: string) => void;
+  setCurrentTournament: (id: Id) => void;
   recordPoint: (lineup: LineupEntry[], scoredBy: 'us' | 'them') => void;
   undoLastPoint: () => void;
   startSecondHalf: () => void;
@@ -97,6 +101,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentTournamentId: getCurrentTournamentId(),
   ready: false,
   players: [],
+  tournaments: [],
   games: [],
   currentGameId: null,
   logs: {},
@@ -109,8 +114,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     const logs: Record<Id, EventEnvelope[]> = {};
     for (const g of games) logs[g.gameId] = await repo.loadLog(g.gameId);
     const currentGameId = games.at(-1)?.gameId ?? null;
+
+    const loaded = await repo.listTournaments();
+    const { tournaments, changed } = backfillTournaments(
+      loaded,
+      games,
+      get().currentTournamentId,
+    );
+    if (changed) {
+      await repo.saveTournaments(tournaments);
+      pushRemote(() => remote!.saveTournaments(tournaments));
+    }
+
     set({
       players: roster?.players ?? [],
+      tournaments,
       games,
       logs,
       currentGameId,
@@ -183,8 +201,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     pushRemote(() => remote!.saveGames(games));
   },
 
-  startNewTournament: () => {
-    set({ currentTournamentId: rollNewTournamentId() });
+  createTournament: (name) => {
+    const t: Tournament = {
+      id: newId(),
+      name: name.trim() || new Date().toLocaleDateString(),
+      createdAt: Date.now(),
+    };
+    const tournaments = [...get().tournaments, t];
+    set({ tournaments, currentTournamentId: t.id });
+    setCurrentTournamentId(t.id);
+    void get().repo.saveTournaments(tournaments);
+    pushRemote(() => remote!.saveTournaments(tournaments));
+    return t.id;
+  },
+
+  renameTournament: (id, name) => {
+    const tournaments = get().tournaments.map((t) =>
+      t.id === id ? { ...t, name } : t,
+    );
+    set({ tournaments });
+    void get().repo.saveTournaments(tournaments);
+    pushRemote(() => remote!.saveTournaments(tournaments));
+  },
+
+  setCurrentTournament: (id) => {
+    set({ currentTournamentId: id });
+    setCurrentTournamentId(id);
   },
 
   recordPoint: (lineup, scoredBy) => {
@@ -222,6 +264,37 @@ function withTeamDefaults(meta: GameMeta): GameMeta {
     ourTeam: meta.ourTeam || DEFAULT_OUR_TEAM,
     theirTeam: meta.theirTeam || DEFAULT_THEIR_TEAM,
   };
+}
+
+/**
+ * Synthesize a tournament record for any tournamentId referenced by a game (or
+ * the current pointer) that has none, so every game groups under a named
+ * tournament. Names default to the earliest game date in the group.
+ */
+function backfillTournaments(
+  tournaments: Tournament[],
+  games: GameMeta[],
+  currentTournamentId: Id,
+): { tournaments: Tournament[]; changed: boolean } {
+  const known = new Set(tournaments.map((t) => t.id));
+  const earliest = new Map<Id, number>();
+  for (const g of games) {
+    if (known.has(g.tournamentId)) continue;
+    const at = earliest.get(g.tournamentId);
+    if (at === undefined || g.createdAt < at) earliest.set(g.tournamentId, g.createdAt);
+  }
+  if (!known.has(currentTournamentId) && !earliest.has(currentTournamentId)) {
+    earliest.set(currentTournamentId, Date.now());
+  }
+  if (earliest.size === 0) return { tournaments, changed: false };
+
+  const added: Tournament[] = [...earliest].map(([id, createdAt]) => ({
+    id,
+    name: new Date(createdAt).toLocaleDateString(),
+    createdAt,
+  }));
+  const merged = [...tournaments, ...added].sort((a, b) => a.createdAt - b.createdAt);
+  return { tournaments: merged, changed: true };
 }
 
 function persistRoster(
@@ -274,10 +347,17 @@ async function reconcileRemote(
   if (!remote || reconcileInFlight) return;
   reconcileInFlight = true;
   try {
-    const [remoteRoster, remoteGames] = await Promise.all([
+    const [remoteRoster, remoteTournaments, remoteGames] = await Promise.all([
       remote.loadRoster(),
+      remote.listTournaments(),
       remote.listGames(),
     ]);
+
+    const tById = new Map<Id, Tournament>();
+    for (const t of remoteTournaments) tById.set(t.id, t);
+    for (const t of get().tournaments) tById.set(t.id, t);
+    const tournaments = [...tById.values()].sort((a, b) => a.createdAt - b.createdAt);
+    await get().repo.saveTournaments(tournaments);
 
     const byId = new Map<Id, GameMeta>();
     for (const g of remoteGames) byId.set(g.gameId, withTeamDefaults(g));
@@ -300,6 +380,7 @@ async function reconcileRemote(
     const currentGameId = get().currentGameId ?? games.at(-1)?.gameId ?? null;
     set({
       players,
+      tournaments,
       games,
       logs,
       currentGameId,
