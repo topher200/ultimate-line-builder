@@ -6,8 +6,6 @@ field each point, while the app keeps track of gender ratio, offense/defense,
 and everyone's playing time so nobody gets frozen out and the best players play
 the biggest points.
 
----
-
 ## 1. The problem
 
 Building a line -- the 7 players on the field for a point -- is hard to do in
@@ -144,8 +142,9 @@ Four layers, cleanly separated:
    rule is a pure function with exhaustive Vitest coverage. This is the most
    important and most-tested part of the codebase.
 2. **Persistence** (`src/persistence/`) -- a `Repository` interface with a
-   localStorage implementation for rev 1 and a Supabase implementation later,
-   plus the log-merge (sync reconciliation) module.
+   `LocalRepository` (localStorage, the offline-first primary) and a
+   `SupabaseRepository` for cloud sync, plus the log-merge (sync
+   reconciliation) module.
 3. **Store** (`src/store/`) -- Zustand, holding the event log + roster, exposing
    derived selectors and action dispatchers that append events and persist.
 4. **UI** (`src/screens/`, `src/components/`) -- React + Tailwind, phone/tablet-first.
@@ -174,10 +173,11 @@ npm run preview    # build, then serve via wrangler dev (production-like)
 
 - **Stack:** React + TypeScript + Vite, installable PWA (vite-plugin-pwa),
   Zustand, Tailwind CSS v4, React Router, Vitest.
-- **Local persistence:** localStorage (rev 1), behind the `Repository` interface
-  in `src/persistence/`.
-- **Cloud (later):** Supabase (Postgres) storing per-game event logs, with
-  client-side longest-chain merge on reconnect.
+- **Local persistence:** localStorage (the offline-first primary), behind the
+  `Repository` interface in `src/persistence/`.
+- **Cloud sync:** Supabase (Postgres) storing per-game event logs, with
+  client-side longest-chain merge on reconnect; active when the `VITE_SUPABASE_*`
+  env vars are set.
 
 ### Deploy (Cloudflare Workers)
 
