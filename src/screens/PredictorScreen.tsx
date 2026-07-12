@@ -50,8 +50,7 @@ export function PredictorScreen() {
       <h1 className="text-2xl font-bold">Predictor</h1>
       <p className="text-sm text-slate-400">
         Project a whole game from the current roster and settings. O and D points
-        alternate through the game; the View filters which players are listed
-        without changing anyone's projection.
+        alternate through the game; the View filters which players are listed.
       </p>
 
       <div className="flex flex-wrap gap-3 rounded-lg bg-slate-800 p-3">
