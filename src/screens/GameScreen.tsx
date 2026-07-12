@@ -47,7 +47,6 @@ function ActiveGame() {
   const recordPoint = useAppStore((s) => s.recordPoint);
   const undoLast = useAppStore((s) => s.undoLast);
   const startSecondHalf = useAppStore((s) => s.startSecondHalf);
-  const overridePossession = useAppStore((s) => s.overridePossession);
   const overrideMajority = useAppStore((s) => s.overrideMajority);
   const updateGameMeta = useAppStore((s) => s.updateGameMeta);
 
@@ -128,14 +127,6 @@ function ActiveGame() {
 
       {/* Point context */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
-        <Segmented
-          options={[
-            { value: 'O', label: 'Offense' },
-            { value: 'D', label: 'Defense' },
-          ]}
-          value={game.nextPossession}
-          onChange={overridePossession}
-        />
         <Segmented
           options={[
             { value: 'M', label: '4M:3W' },
