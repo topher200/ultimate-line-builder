@@ -143,7 +143,7 @@ expected total points for the game is an editable box (default **20**).
 | --- | --- | --- | --- |
 | **Roster** | Head coach | Yes (sensitive) | Manage players: gender, O/D line, competitiveness slider, active toggle. |
 | **Game** | Assistant coach | **No** | Live line calling: current line with MMP/WMP marked, +1 Us / +1 Them, force O/D, subs, expected-points box, per-player played/goal/predicted, game-competitiveness slider. |
-| **Predictor** | Coach | Yes | Simulate a game assuming O and D points trade; filter O-only / D-only. Later iteration. |
+| **Predictor** | Coach | Yes | Simulate a game assuming O and D points trade, showing each player's predicted points over their target. The MMP/WMP + O/D view filters who is listed without changing the simulation (a single line's numbers stay the same whether or not the other is shown). |
 | **Doctor** | Coach | n/a | A panel (on Roster) flagging misconfiguration: not enough MMPs/WMPs for a legal line, impossible to guarantee everyone a point, etc. |
 
 The **competitiveness rating is sensitive** (players may see the tablet) and

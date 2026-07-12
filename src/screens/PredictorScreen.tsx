@@ -3,9 +3,14 @@ import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState, freshGameState } from '../domain/fold.ts';
 import { computeTargets, predictGame } from '../domain/engine.ts';
 import { GameSettings } from '../components/GameSettings.tsx';
+import { ViewFilterBar } from '../components/ViewFilterBar.tsx';
+import { Segmented } from '../components/Segmented.tsx';
+import {
+  matchesView,
+  type GenderView,
+  type LineView,
+} from '../components/viewFilter.ts';
 import type { MajorityGender, Possession } from '../domain/types.ts';
-
-type View = 'all' | 'O' | 'D';
 
 export function PredictorScreen() {
   const players = useAppStore((s) => s.players);
@@ -13,27 +18,30 @@ export function PredictorScreen() {
 
   const [possession, setPossession] = useState<Possession>('D');
   const [majority, setMajority] = useState<MajorityGender>('M');
-  const [view, setView] = useState<View>('all');
+  const [genderView, setGenderView] = useState<GenderView>('ALL');
+  const [lineView, setLineView] = useState<LineView>('ALL');
 
   // Expected points and competitiveness are the live game's, shared with the
-  // other screens; possession, ratio, and line view are Predictor what-ifs.
+  // other screens; possession and ratio are Predictor what-ifs.
   const { expectedPoints, mode } = useMemo(() => deriveState(events), [events]);
 
-  const predicted = useMemo(() => {
+  const { predicted, targets } = useMemo(() => {
     const game = freshGameState({
       startingPossession: possession,
       startingMajority: majority,
       expectedPoints,
       mode,
     });
-    const targets = computeTargets(players, expectedPoints, mode);
-    return predictGame(game, players, targets, {
-      forcePossession: view === 'all' ? undefined : view,
-    });
-  }, [players, possession, majority, expectedPoints, mode, view]);
+    const t = computeTargets(players, expectedPoints, mode);
+    // O and D points always trade, so each player only plays their own line's
+    // points. The view filters who is listed; it never changes the simulation,
+    // so a single line's numbers are the same whether or not the other shows.
+    return { predicted: predictGame(game, players, t), targets: t };
+  }, [players, possession, majority, expectedPoints, mode]);
 
-  const shown = players
-    .filter((p) => p.active && (view === 'all' || p.line === view))
+  const active = players.filter((p) => p.active);
+  const shown = active
+    .filter((p) => matchesView(p, genderView, lineView))
     .sort((a, b) => (predicted[b.id] ?? 0) - (predicted[a.id] ?? 0));
   const maxPred = Math.max(1, ...shown.map((p) => predicted[p.id] ?? 0));
 
@@ -41,9 +49,9 @@ export function PredictorScreen() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">Predictor</h1>
       <p className="text-sm text-slate-400">
-        Project a whole game from the current roster and settings. O and D
-        points alternate through the game; switch the View to project a single
-        line instead.
+        Project a whole game from the current roster and settings. O and D points
+        alternate through the game; the View filters which players are listed
+        without changing anyone's projection.
       </p>
 
       <div className="flex flex-wrap gap-3 rounded-lg bg-slate-800 p-3">
@@ -67,20 +75,17 @@ export function PredictorScreen() {
             onChange={setMajority}
           />
         </Field>
-        <Field label="View">
-          <Segmented
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'O', label: 'O line' },
-              { value: 'D', label: 'D line' },
-            ]}
-            value={view}
-            onChange={setView}
-          />
-        </Field>
       </div>
 
       <GameSettings />
+      <ViewFilterBar
+        gender={genderView}
+        line={lineView}
+        onGender={setGenderView}
+        onLine={setLineView}
+        shown={shown.length}
+        total={active.length}
+      />
 
       <div className="flex flex-col gap-1 rounded-lg bg-slate-800 p-3">
         {shown.map((p) => (
@@ -102,16 +107,28 @@ export function PredictorScreen() {
                 }}
               />
             </div>
-            <span className="w-10 text-right tabular-nums">
+            <span className="w-16 text-right tabular-nums">
               {predicted[p.id] ?? 0}
+              <span className="text-xs text-slate-500">
+                {' '}
+                /{Math.round(targets[p.id] ?? 0)}
+              </span>
             </span>
           </div>
         ))}
         {shown.length === 0 && (
           <p className="p-4 text-center text-slate-400">
-            Add active players on the Roster screen to simulate.
+            {active.length === 0
+              ? 'Add active players on the Roster screen to simulate.'
+              : 'No players match this view.'}
           </p>
         )}
+        <p className="mt-2 border-t border-slate-700 pt-2 text-xs text-slate-500">
+          Each row shows{' '}
+          <span className="font-semibold text-slate-400">predicted</span> points
+          this game over the player&apos;s{' '}
+          <span className="font-semibold text-slate-400">target</span>.
+        </p>
       </div>
     </div>
   );
@@ -123,31 +140,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-xs text-slate-400">{label}</span>
       {children}
     </label>
-  );
-}
-
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="flex overflow-hidden rounded">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          className={`px-3 py-2 text-sm font-semibold ${
-            o.value === value ? 'bg-emerald-600' : 'bg-slate-700 text-slate-300'
-          }`}
-          onClick={() => onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }

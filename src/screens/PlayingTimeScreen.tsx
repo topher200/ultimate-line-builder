@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore.ts';
 import { deriveState } from '../domain/fold.ts';
-import { computeTargets, predictGame } from '../domain/engine.ts';
 import { sameDay, sumPlayedAcross } from '../domain/aggregate.ts';
 import { ViewFilterBar } from '../components/ViewFilterBar.tsx';
 import {
@@ -10,6 +9,31 @@ import {
   type LineView,
 } from '../components/viewFilter.ts';
 import { GameSettings } from '../components/GameSettings.tsx';
+
+type SortKey = 'game' | 'day' | 'tourn';
+
+function SortHeader({
+  label,
+  col,
+  sortKey,
+  onSort,
+}: {
+  label: string;
+  col: SortKey;
+  sortKey: SortKey;
+  onSort: (k: SortKey) => void;
+}) {
+  const active = sortKey === col;
+  return (
+    <button
+      className={`text-right ${active ? 'text-emerald-400' : 'text-slate-400'}`}
+      onClick={() => onSort(col)}
+    >
+      {label}
+      {active ? ' ▾' : ''}
+    </button>
+  );
+}
 
 export function PlayingTimeScreen() {
   const players = useAppStore((s) => s.players);
@@ -23,12 +47,9 @@ export function PlayingTimeScreen() {
 
   const [genderView, setGenderView] = useState<GenderView>('ALL');
   const [lineView, setLineView] = useState<LineView>('ALL');
+  const [sortKey, setSortKey] = useState<SortKey>('game');
 
-  const { game, targets, predicted } = useMemo(() => {
-    const g = deriveState(events);
-    const t = computeTargets(players, g.expectedPoints, g.mode, 0.5, g.modeBaseline);
-    return { game: g, targets: t, predicted: predictGame(g, players, t) };
-  }, [events, players]);
+  const game = useMemo(() => deriveState(events), [events]);
 
   const { dayPlayed, tournamentPlayed } = useMemo(() => {
     const current = games.find((m) => m.gameId === currentGameId);
@@ -45,10 +66,25 @@ export function PlayingTimeScreen() {
     };
   }, [games, logs, currentGameId]);
 
+  const valueFor = (id: string, key: SortKey): number => {
+    switch (key) {
+      case 'game':
+        return game.played[id] ?? 0;
+      case 'day':
+        return dayPlayed[id] ?? 0;
+      case 'tourn':
+        return tournamentPlayed[id] ?? 0;
+    }
+  };
+
   const active = players.filter((p) => p.active);
   const shown = active
     .filter((p) => matchesView(p, genderView, lineView))
-    .sort((a, b) => (predicted[b.id] ?? 0) - (predicted[a.id] ?? 0));
+    .sort(
+      (a, b) =>
+        valueFor(b.id, sortKey) - valueFor(a.id, sortKey) ||
+        a.name.localeCompare(b.name),
+    );
 
   if (!currentGameId || events.length === 0) {
     return (
@@ -67,8 +103,8 @@ export function PlayingTimeScreen() {
         <h1 className="text-2xl font-bold">Playing time</h1>
         <p className="text-sm text-slate-400">
           {meta?.ourTeam} vs {meta?.theirTeam}
-          {tournament && <> &middot; {tournament.name}</>} &middot; predictions are
-          for this game
+          {tournament && <> &middot; {tournament.name}</>} &middot; points played
+          this game, day, and tournament
         </p>
       </div>
 
@@ -83,15 +119,14 @@ export function PlayingTimeScreen() {
       />
 
       <div className="rounded-lg bg-slate-800 p-3">
-        <div className="mb-2 grid grid-cols-6 text-sm font-semibold text-slate-400">
+        <div className="mb-2 grid grid-cols-5 text-sm font-semibold text-slate-400">
           <span className="col-span-2">Player</span>
-          <span className="text-right">Game</span>
-          <span className="text-right">Day</span>
-          <span className="text-right">Tourn</span>
-          <span className="text-right">Pred</span>
+          <SortHeader label="Game" col="game" sortKey={sortKey} onSort={setSortKey} />
+          <SortHeader label="Day" col="day" sortKey={sortKey} onSort={setSortKey} />
+          <SortHeader label="Tourn" col="tourn" sortKey={sortKey} onSort={setSortKey} />
         </div>
         {shown.map((p) => (
-          <div key={p.id} className="grid grid-cols-6 border-t border-slate-700 py-1">
+          <div key={p.id} className="grid grid-cols-5 border-t border-slate-700 py-1">
             <span className="col-span-2 flex items-center gap-2">
               <span
                 className={`h-2 w-2 rounded-full ${
@@ -108,12 +143,6 @@ export function PlayingTimeScreen() {
             <span className="text-right tabular-nums text-slate-300">
               {tournamentPlayed[p.id] ?? 0}
             </span>
-            <span className="text-right tabular-nums text-slate-400">
-              {predicted[p.id] ?? 0}{' '}
-              <span className="text-xs text-slate-500">
-                /{Math.round(targets[p.id] ?? 0)}
-              </span>
-            </span>
           </div>
         ))}
         {shown.length === 0 && (
@@ -127,9 +156,8 @@ export function PlayingTimeScreen() {
           <span className="font-semibold text-slate-400">Game</span>,{' '}
           <span className="font-semibold text-slate-400">Day</span>, and{' '}
           <span className="font-semibold text-slate-400">Tourn</span> are points
-          played so far this game, today, and this tournament.{' '}
-          <span className="font-semibold text-slate-400">Pred</span> is the
-          projected points this player finishes the game with, over their target.
+          played so far this game, today, and this tournament. See the Predictor
+          screen for projected points and targets.
         </p>
       </div>
     </div>
