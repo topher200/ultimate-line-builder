@@ -85,6 +85,7 @@ function ActiveGame() {
     MMP: lineup.filter((l) => byId(l.playerId)?.gender === 'MMP').length,
     WMP: lineup.filter((l) => byId(l.playerId)?.gender === 'WMP').length,
   };
+  const ratioOk = counts.MMP === slots.MMP && counts.WMP === slots.WMP;
 
   const score = (scoredBy: 'us' | 'them') => recordPoint(lineup, scoredBy);
   const rename = (patch: { ourTeam?: string; theirTeam?: string }) => {
@@ -165,7 +166,13 @@ function ActiveGame() {
         <div className="mb-2 flex items-center justify-between">
           <span className="font-semibold">
             Line{' '}
-            <span className={counts.MMP === slots.MMP ? 'text-slate-400' : 'text-amber-300'}>
+            <span
+              className={
+                ratioOk
+                  ? 'text-slate-400'
+                  : 'rounded bg-red-500/20 px-1.5 py-0.5 font-semibold text-red-300'
+              }
+            >
               ({counts.MMP} MMP / {counts.WMP} WMP, need {slots.MMP}/{slots.WMP})
             </span>
           </span>
@@ -217,18 +224,33 @@ function ActiveGame() {
           <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
             Bench (tap to add / sub)
           </div>
-          <div className="flex flex-wrap gap-2">
-            {bench.map((p) => (
-              <button
-                key={p.id}
-                className={`rounded px-3 py-2 ${
-                  p.gender === 'MMP' ? 'bg-sky-800' : 'bg-fuchsia-800'
-                }`}
-                onClick={() => setLineup([...lineup, { playerId: p.id }])}
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-3">
+            {(['O', 'D'] as Line[]).map((line) => {
+              const onBench = bench.filter((p) => p.line === line);
+              return (
+                <div key={line}>
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {line} line
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {onBench.map((p) => (
+                      <button
+                        key={p.id}
+                        className={`rounded px-3 py-2 ${
+                          p.gender === 'MMP' ? 'bg-sky-800' : 'bg-fuchsia-800'
+                        }`}
+                        onClick={() => setLineup([...lineup, { playerId: p.id }])}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
+                    {onBench.length === 0 && (
+                      <span className="text-xs text-slate-600">none</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -236,7 +258,7 @@ function ActiveGame() {
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 p-3">
         <button className="rounded bg-slate-600 px-4 py-2" onClick={undoLast}>
-          Undo
+          Undo last point
         </button>
         <button className="rounded bg-slate-600 px-4 py-2" onClick={startSecondHalf}>
           Start 2nd half
