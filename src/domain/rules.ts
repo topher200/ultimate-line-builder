@@ -9,16 +9,16 @@ export function oppositePossession(p: Possession): Possession {
 }
 
 /**
- * Majority gender for a point, following the repeating ABBA pattern.
- * `pointInHalf` is 1-based. Position 1 and 4 of each 4-point cycle use the
- * starting majority; positions 2 and 3 use the opposite. Since the second half
- * restarts the count at 1, it opens on the same majority as the game's start.
+ * Majority gender for a point, following the repeating ABBA pattern across the
+ * whole game. `pointNumber` is the 1-based whole-game point index. Positions 1
+ * and 4 of each 4-point cycle use the starting majority; positions 2 and 3 use
+ * the opposite. The cycle is continuous: halftime does not restart it.
  */
 export function majorityForPoint(
-  pointInHalf: number,
+  pointNumber: number,
   startingMajority: MajorityGender,
 ): MajorityGender {
-  const offset = (pointInHalf - 1) % 4;
+  const offset = (pointNumber - 1) % 4;
   return offset === 0 || offset === 3
     ? startingMajority
     : oppositeMajority(startingMajority);
