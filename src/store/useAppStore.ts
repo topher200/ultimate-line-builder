@@ -117,6 +117,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     const { repo } = get();
     const roster = await repo.loadRoster();
+    // Migrate ratings saved before the 10% lock to the nearest increment.
+    const players = (roster?.players ?? []).map(snapCompetitiveness);
+    const ratingsChanged =
+      roster != null && players.some((p, i) => p !== roster.players[i]);
+    if (ratingsChanged && roster) {
+      const migrated: Roster = { ...roster, players };
+      await repo.saveRoster(migrated);
+      pushRemote(() => remote!.saveRoster(migrated));
+    }
     const games = (await repo.listGames()).map(withTeamDefaults);
     const logs: Record<Id, EventEnvelope[]> = {};
     for (const g of games) logs[g.gameId] = await repo.loadLog(g.gameId);
@@ -134,7 +143,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set({
-      players: roster?.players ?? [],
+      players,
       rosterUpdatedAt: roster?.updatedAt ?? 0,
       tournaments,
       games,
@@ -350,6 +359,12 @@ function withTeamDefaults(meta: GameMeta): GameMeta {
   };
 }
 
+/** Round a rating to the nearest 10% so ratings stay on the UI's increments. */
+function snapCompetitiveness(p: Player): Player {
+  const snapped = Math.round(p.competitiveness * 10) / 10;
+  return snapped === p.competitiveness ? p : { ...p, competitiveness: snapped };
+}
+
 /** Most recently listed game that hasn't been soft-deleted. */
 function lastLiveGameId(games: GameMeta[]): Id | null {
   for (let i = games.length - 1; i >= 0; i--) {
@@ -419,12 +434,13 @@ function persistRoster(
   set: (partial: Partial<AppState>) => void,
   players: Player[],
 ): void {
+  const snapped = players.map(snapCompetitiveness);
   const roster: Roster = {
-    players,
+    players: snapped,
     updatedAt: Date.now(),
     updatedBy: get().deviceId,
   };
-  set({ players, rosterUpdatedAt: roster.updatedAt });
+  set({ players: snapped, rosterUpdatedAt: roster.updatedAt });
   void get().repo.saveRoster(roster);
   pushRemote(() => remote!.saveRoster(roster));
 }
