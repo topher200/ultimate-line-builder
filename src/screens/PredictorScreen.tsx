@@ -107,11 +107,11 @@ export function PredictorScreen() {
                 }}
               />
             </div>
-            <span className="w-16 text-right tabular-nums">
+            <span className="w-20 text-right tabular-nums">
               {predicted[p.id] ?? 0}
               <span className="text-xs text-slate-500">
                 {' '}
-                /{Math.round(targets[p.id] ?? 0)}
+                /{formatGoal(targets[p.id] ?? 0)}
               </span>
             </span>
           </div>
@@ -132,6 +132,16 @@ export function PredictorScreen() {
       </div>
     </div>
   );
+}
+
+/**
+ * A goal is a fractional share of the game, so show it as a floor-ceil range
+ * ("6-7"), collapsing to a single number when it is (near) a whole number.
+ */
+function formatGoal(t: number): string {
+  const lo = Math.floor(t + 0.001);
+  const hi = Math.ceil(t - 0.001);
+  return lo >= hi ? `${lo}` : `${lo}-${hi}`;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
