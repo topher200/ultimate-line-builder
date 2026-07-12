@@ -54,8 +54,9 @@ does it again for the next point.
 - At the **start of the game** the captain declares O or D.
 - At **half time**, possession resets: if we **started the game on D**, we start
   the second half on **O** (and vice versa).
-- There is always a manual **force O line / force D line** toggle to override
-  the derived possession.
+- Possession follows automatically from the score; there is no manual possession
+  toggle. To cross lines for a single point (e.g. field the D line on an offense
+  point) tap **Play this line**.
 
 ### Gender ratio
 
@@ -87,8 +88,8 @@ into the game.) Starting on W it would be `W2 M1 M2 W1 W2 ...`.
 same pattern such that the first point of the second half uses the **same
 ratio as the first point of the game**. (A 7-5 half = 12 points played; the
 4-point pattern realigns, so if the game opened on W2 the second half opens on
-W2 again.) The engine computes this deterministically and always allows a manual
-per-point override.
+W2 again.) The engine computes this deterministically from the game's starting
+ratio, which you can correct on the Game screen if it was set wrong.
 
 ### Injury subs
 
@@ -103,9 +104,9 @@ The app tracks playing time per **game**, per **day**, and per **tournament**.
 
 ## 3. Playing-time strategy
 
-Each player has a **competitiveness rating** (0-100%): how much we want them on
-the field during competitive points. A star might be 100%, a deep-bench player
-10%, and 0% is allowed. The **game-competitiveness** control blends how ratings translate into
+Each player has a **competitiveness rating** (0-100%, set in 10% steps): how much
+we want them on the field during competitive points. A star might be 100%, a
+deep-bench player 10%, and 0% is allowed. The **game-competitiveness** control blends how ratings translate into
 targets:
 
 - **Competitive** -- play time roughly proportional to competitiveness rating.
@@ -147,7 +148,7 @@ Four layers, cleanly separated:
    plus the log-merge (sync reconciliation) module.
 3. **Store** (`src/store/`) -- Zustand, holding the event log + roster, exposing
    derived selectors and action dispatchers that append events and persist.
-4. **UI** (`src/screens/`, `src/components/`) -- React + Tailwind, tablet-first.
+4. **UI** (`src/screens/`, `src/components/`) -- React + Tailwind, phone/tablet-first.
 
 ### Data model in one paragraph
 
@@ -197,12 +198,12 @@ as a fallback.
 
 ```
 src/
-  domain/        pure TS, no React, fully unit-tested (35 tests):
+  domain/        pure TS, no React, fully unit-tested (58 tests):
                    types, rules (ABBA/possession), fold (deriveState),
                    engine (targets/selectLine/predictGame), aggregate, doctor
   persistence/   Repository interface + LocalRepository
   store/         Zustand store: event log + roster + all actions
-  screens/       Roster, Game, Predictor (all built)
+  screens/       Roster, Games, Game, Playing time, Predictor
 docs/DATA_MODEL.md   deep spec: events, fold, sync merge, rotation engine
 ```
 

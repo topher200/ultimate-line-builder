@@ -109,6 +109,9 @@ type EventPayload =
       scoredBy: 'us' | 'them'; }
   | { kind: 'ExpectedPointsChanged'; value: number }
   | { kind: 'ModeChanged'; value: number }
+  | { kind: 'StartConfigChanged';
+      startingPossession?: Possession;   // correct what the game started on
+      startingMajority?: MajorityGender; }
   | { kind: 'PossessionOverridden'; value: Possession }   // next point only
   | { kind: 'MajorityOverridden'; value: MajorityGender }  // next point only
   | { kind: 'HalfStarted' }            // marks the second-half boundary
@@ -272,7 +275,7 @@ A point is played entirely by one line: an O point by the O line, a D point by
 the D line. The engine **never** suggests a mixed line drawing from both. Each
 player only ever plays with their own line's players. The coach can manually
 **call the other whole line** for a point (most often the D line onto an offense
-point) via the fielded-line toggle; the engine then suggests that line's
+point) with the **Play this line** button; the engine then suggests that line's
 players. It never proposes the cross-line call itself, and if a fielded line is
 short a gender it flags the shortfall rather than borrowing from the other line.
 
@@ -300,10 +303,16 @@ whole-game goal.
 
 ```
 remaining          = max(0, expectedPoints - baseline.totalPoints)
-remainingSlots(g)  = avgSlotsPerPoint(gender) * remaining * lineShare  // O or D share
-target(p) = min(expectedPoints,
+linePoints         = expectedPoints * lineShare        // points this line plays (O or D share)
+remainingSlots(g)  = avgSlotsPerPoint(gender) * remaining * lineShare
+target(p) = min(linePoints,
                 baseline.played[p] + remainingSlots * weight(p) / sum(weight over pool))
 ```
+
+The cap is `linePoints`, not the whole game: a player only ever plays their own
+line's points, so a heavily-weighted star's goal can't exceed how many points
+that line plays (capping at `expectedPoints` would hand out goals no one on that
+line could reach).
 
 `target(p)` is the player's **Goal**. The deficit then collapses to "your share
 of the remaining pool minus what you've played since the slider moved," so right
