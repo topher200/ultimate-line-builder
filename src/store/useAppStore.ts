@@ -482,11 +482,26 @@ async function reconcileRemote(
     const prevId = get().currentGameId;
     const stillLive = games.some((g) => g.gameId === prevId && !g.deletedAt);
     const currentGameId = stillLive ? prevId : lastLiveGameId(games);
+
+    // Another device may have tombstoned the tournament this device had
+    // selected; re-point at the newest live one so new games don't land in a
+    // deleted (and thus invisible) tournament.
+    let currentTournamentId = get().currentTournamentId;
+    const liveTournaments = tournaments.filter((t) => !t.deletedAt);
+    if (!liveTournaments.some((t) => t.id === currentTournamentId)) {
+      const newest = [...liveTournaments].sort((a, b) => b.createdAt - a.createdAt)[0];
+      if (newest) {
+        currentTournamentId = newest.id;
+        setCurrentTournamentId(currentTournamentId);
+      }
+    }
+
     set({
       players,
       rosterUpdatedAt,
       tournaments,
       games,
+      currentTournamentId,
       logs,
       currentGameId,
       events: currentGameId ? (logs[currentGameId] ?? []) : [],
