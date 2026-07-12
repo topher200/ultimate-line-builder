@@ -1,5 +1,6 @@
 @README.md
 
 # General notes
-- Always ensure the app is running after your turn is over. Restart the app with
-latest changes after you make changes.
+- The dev server (`npm run dev`, Vite with HMR) is run separately from Claude,
+  so file edits hot-reload without any restart. Don't restart it after making
+  changes. If it isn't running, start it (`npm run dev`).
